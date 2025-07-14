@@ -1,0 +1,323 @@
+// This is your updated Prisma schema file
+// Includes logic for ticket reservation, expiration, and safe checkout
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "windows", "darwin-arm64"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  USER
+  OWNER_ORGANIZER
+  ADMIN_ORGANIZER
+  ADMIN
+  SUPERADMIN
+}
+
+enum OrderStatus {
+  pending
+  paid
+  expired
+  cancelled
+}
+
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String?
+  role            UserRole @default(USER)
+  is_verified     Boolean  @default(false)
+  supabase_id     String?  @unique
+  phone           String?
+  avatar_url      String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  referral_codes     ReferralCode[]
+  email_logs         EmailLog[]
+  orders             Order[]
+  checkin_logs       CheckinLog[]
+  user_organizations UserOrganization[]
+  tracking_visits    TrackingVisit[]
+  webhook_logs       WebhookLog[]
+  images             Image[]
+
+  @@map("users")
+}
+
+model Organization {
+  id                    Int      @id @default(autoincrement())
+  name                  String
+  contact_email         String?
+  phone                 String?
+  address               String?
+  created_at            DateTime @default(now())
+  updated_at            DateTime @default(now())
+
+  events                Event[]
+  webhook_subscriptions WebhookSubscription[]
+  user_organizations    UserOrganization[]
+  image_links           ImageLink[]
+}
+
+model PromoCode {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique
+  description     String?
+  discount_type   String
+  discount_value  Decimal
+  max_uses        Int      @default(1)
+  uses            Int      @default(0)
+  valid_from      DateTime?
+  valid_until     DateTime?
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
+
+  order_promos    OrderPromo[]
+}
+
+model OrderPromo {
+  id               Int       @id @default(autoincrement())
+  order_id         Int
+  promo_code_id    Int
+  discount_applied Decimal
+  created_at       DateTime  @default(now())
+  updated_at       DateTime  @default(now())
+
+  order            Order     @relation(fields: [order_id], references: [id])
+  promo_code       PromoCode @relation(fields: [promo_code_id], references: [id])
+}
+
+model ReferralCode {
+  id         Int      @id @default(autoincrement())
+  user_id    String
+  code       String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  user       User     @relation(fields: [user_id], references: [id])
+}
+
+model EmailLog {
+  id            Int      @id @default(autoincrement())
+  user_id       String
+  event_id      Int?
+  email_type    String
+  subject       String
+  status        String
+  sent_at       DateTime?
+  error_message String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  user          User     @relation(fields: [user_id], references: [id])
+  event         Event?   @relation(fields: [event_id], references: [id])
+}
+
+model WebhookLog {
+  id            Int      @id @default(autoincrement())
+  target_url    String
+  event_type    String
+  order_id      Int?
+  event_id      Int?
+  user_id       String?
+  payload       String
+  status_code   Int
+  response_text String?
+  triggered_at  DateTime @default(now())
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  order         Order?   @relation(fields: [order_id], references: [id])
+  event         Event?   @relation(fields: [event_id], references: [id])
+  user          User?    @relation(fields: [user_id], references: [id])
+}
+
+model WebhookSubscription {
+  id              Int      @id @default(autoincrement())
+  organization_id Int
+  target_url      String
+  event_type      String
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
+
+  organization    Organization @relation(fields: [organization_id], references: [id])
+}
+
+model TrackingVisit {
+  id           Int      @id @default(autoincrement())
+  user_id      String?
+  event_id     Int
+  utm_source   String?
+  utm_medium   String?
+  utm_campaign String?
+  utm_content  String?
+  referrer_url String?
+  landing_page String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  user         User?    @relation(fields: [user_id], references: [id])
+  event        Event    @relation(fields: [event_id], references: [id])
+}
+
+model Event {
+  id               Int      @id @default(autoincrement())
+  organization_id  Int
+  name             String
+  description      String?
+  date             DateTime
+  location         String?
+  created_at       DateTime @default(now())
+  updated_at       DateTime @default(now())
+
+  organization     Organization @relation(fields: [organization_id], references: [id])
+  tickets          Ticket[]
+  email_logs       EmailLog[]
+  webhook_logs     WebhookLog[]
+  checkin_logs     CheckinLog[]
+  tracking_visits  TrackingVisit[]
+  event_settings   EventSetting[]
+  image_links      ImageLink[]
+}
+
+model Ticket {
+  id              Int      @id @default(autoincrement())
+  event_id        Int
+  name            String
+  price           Decimal
+  type            String
+  total           Int
+  sold            Int
+  start_sale_date DateTime?
+  end_sale_date   DateTime?
+  is_active       Boolean  @default(true)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
+
+  event           Event    @relation(fields: [event_id], references: [id])
+  order_items     OrderItem[]
+  checkin_logs    CheckinLog[]
+}
+
+model Order {
+  id             Int          @id @default(autoincrement())
+  user_id        String?
+  status         OrderStatus
+  reserved_until DateTime?
+  expired_at     DateTime?
+  payment_method String
+  amount         Decimal
+  created_at     DateTime     @default(now())
+  updated_at     DateTime     @default(now())
+
+  user           User?        @relation(fields: [user_id], references: [id])
+  order_items    OrderItem[]
+  order_promos   OrderPromo[]
+  payments       Payment[]
+  webhook_logs   WebhookLog[]
+}
+
+model OrderItem {
+  id             Int      @id @default(autoincrement())
+  order_id       Int
+  ticket_id      Int
+  quantity       Int
+  price_snapshot Decimal
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+
+  order          Order    @relation(fields: [order_id], references: [id])
+  ticket         Ticket   @relation(fields: [ticket_id], references: [id])
+}
+
+model Payment {
+  id         Int      @id @default(autoincrement())
+  order_id   Int
+  gateway    String
+  status     String
+  txn_code   String?
+  paid_at    DateTime?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+
+  order      Order    @relation(fields: [order_id], references: [id])
+}
+
+model CheckinLog {
+  id           Int      @id @default(autoincrement())
+  user_id      String
+  ticket_id    Int
+  event_id     Int
+  checkin_time DateTime
+  verified_by  String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  user         User     @relation(fields: [user_id], references: [id])
+  ticket       Ticket   @relation(fields: [ticket_id], references: [id])
+  event        Event    @relation(fields: [event_id], references: [id])
+}
+
+model UserOrganization {
+  id              Int      @id @default(autoincrement())
+  user_id         String
+  organization_id Int
+  role            String
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
+
+  user            User     @relation(fields: [user_id], references: [id])
+  organization    Organization @relation(fields: [organization_id], references: [id])
+}
+
+model EventSetting {
+  id            Int      @id @default(autoincrement())
+  event_id      Int
+  setting_key   String
+  setting_value String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @default(now())
+
+  event         Event    @relation(fields: [event_id], references: [id])
+}
+
+model Image {
+  id           Int      @id @default(autoincrement())
+  file_path    String
+  file_name    String?
+  file_type    String?
+  file_size    Int?
+  alt_text     String?
+  uploaded_by  String
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+
+  user         User     @relation(fields: [uploaded_by], references: [id])
+  image_links  ImageLink[]
+}
+
+model ImageLink {
+  id              Int      @id @default(autoincrement())
+  image_id        Int
+  entity_type     String
+  entity_id       Int
+  organization_id Int?
+  event_id        Int?
+  usage_type      String
+  linked_at       DateTime @default(now())
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
+
+  image           Image    @relation(fields: [image_id], references: [id])
+  organization    Organization? @relation(fields: [organization_id], references: [id])
+  event           Event?   @relation(fields: [event_id], references: [id])
+}
