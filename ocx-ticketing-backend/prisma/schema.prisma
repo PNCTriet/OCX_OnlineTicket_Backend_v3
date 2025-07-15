@@ -8,6 +8,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
 }
 
 // User Roles Enum
@@ -56,7 +57,9 @@ model User {
   email       String   @unique
   first_name  String?
   last_name   String?
+  phone       String?
   avatar_url  String?
+  is_verified Boolean  @default(false)
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
@@ -64,23 +67,29 @@ model User {
   user_organizations UserOrganization[]
   orders            Order[]
   checkin_logs      CheckinLog[]
+  email_logs        EmailLog[]
 
   @@map("users")
 }
 
 // Organization Model
 model Organization {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  logo_url    String?
-  website     String?
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  contact_email String?
+  phone         String?
+  address       String?
+  logo_url      String?
+  website       String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
   // Relationships
   user_organizations UserOrganization[]
   events            Event[]
+  orders            Order[] // <-- Thêm dòng này để fix lỗi Prisma relation
+  webhook_logs      WebhookLog[]
 
   @@map("organizations")
 }
@@ -165,6 +174,7 @@ model Order {
   order_items  OrderItem[]
   payments     Payment[]
   checkin_logs CheckinLog[]
+  email_logs   EmailLog[]
 
   @@map("orders")
 }
@@ -221,27 +231,34 @@ model CheckinLog {
 
 // EmailLog Model
 model EmailLog {
-  id        String   @id @default(cuid())
-  user_id   String
-  order_id  String?
-  email_type String  // "order_confirmation", "payment_success", "ticket_delivery"
-  status    String   // "sent", "failed", "pending"
-  sent_at   DateTime @default(now())
-  error     String?
+  id         String   @id @default(cuid())
+  user_id    String
+  order_id   String?
+  email_type String   // "order_confirmation", "payment_success", "ticket_delivery"
+  status     String   // "sent", "failed", "pending"
+  sent_at    DateTime @default(now())
+  error      String?
+
+  // Relationships
+  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  order Order? @relation(fields: [order_id], references: [id])
 
   @@map("email_logs")
 }
 
 // WebhookLog Model
 model WebhookLog {
-  id           String   @id @default(cuid())
+  id              String   @id @default(cuid())
   organization_id String
-  event_type   String   // "order_created", "payment_completed", "checkin_completed"
-  payload      String   // JSON payload
-  status       String   // "sent", "failed", "pending"
-  retry_count  Int      @default(0)
-  sent_at      DateTime @default(now())
-  error        String?
+  event_type      String   // "order_created", "payment_completed", "checkin_completed"
+  payload         String   // JSON payload
+  status          String   // "sent", "failed", "pending"
+  retry_count     Int      @default(0)
+  sent_at         DateTime @default(now())
+  error           String?
+
+  // Relationships
+  organization Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
 
   @@map("webhook_logs")
 }

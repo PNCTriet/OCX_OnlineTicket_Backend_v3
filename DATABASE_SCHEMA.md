@@ -20,7 +20,10 @@
 │                 │    │                  │    │                 │
 │ - supabase_id   │◄──►│ - name          │◄──►│ - title         │
 │ - email         │    │ - description    │    │ - location      │
-│ - role          │    │ - logo_url       │    │ - start_date    │
+│ - first_name    │    │ - contact_email  │    │ - start_date    │
+│ - last_name     │    │ - phone          │    │ - end_date      │
+│ - phone         │    │ - address        │    │ - banner_url    │
+│ - is_verified   │    │ - logo_url       │    │ - status        │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
          │                       │                       │
          │                       │                       │
@@ -31,6 +34,7 @@
 │ - price         │    │ - total_amount   │    │ - amount        │
 │ - total_qty     │    │ - status         │    │ - payment_method│
 │ - sold_qty      │    │ - reserved_until │    │ - transaction_id│
+│ - status        │    │ - organization_id│    │ - currency      │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
          │                       │                       │
          │                       │                       │
@@ -56,7 +60,9 @@ model User {
   email       String   @unique
   first_name  String?
   last_name   String?
+  phone       String?
   avatar_url  String?
+  is_verified Boolean  @default(false)
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 }
@@ -64,26 +70,34 @@ model User {
 
 **Chức năng:**
 - **Supabase Integration:** Mapping user từ Supabase Auth
-- **Profile Management:** Thông tin cá nhân người dùng
+- **Profile Management:** Thông tin cá nhân người dùng (first_name, last_name)
+- **Contact Information:** Số điện thoại để liên lạc
+- **Verification Status:** Theo dõi trạng thái xác thực tài khoản
 - **Multi-organization:** Một user có thể thuộc nhiều organization
+- **CUID IDs:** Collision-resistant unique identifiers
 
 ### 🏢 Organization Management
 ```sql
 model Organization {
-  id          String   @id @default(cuid())
-  name        String
-  description String?
-  logo_url    String?
-  website     String?
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  contact_email String?
+  phone         String?
+  address       String?
+  logo_url      String?
+  website       String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 }
 ```
 
 **Chức năng:**
 - **Tenant Isolation:** Mỗi organization là một tenant riêng biệt
+- **Contact Information:** Email, phone, address để liên lạc
 - **Brand Management:** Logo, website, description cho tổ chức
 - **Event Ownership:** Tổ chức sở hữu các sự kiện
+- **Business Details:** Thông tin đầy đủ cho tổ chức
 
 ### 🔗 User-Organization Relationship
 ```sql
@@ -128,6 +142,7 @@ model Event {
 **Chức năng:**
 - **Event Creation:** Tạo sự kiện với thông tin chi tiết
 - **Status Management:** DRAFT → PUBLISHED → CANCELLED
+- **Date Range:** start_date và end_date cho sự kiện
 - **Media Support:** Banner image cho sự kiện
 - **Organization Binding:** Event thuộc về organization cụ thể
 
@@ -154,6 +169,7 @@ model Ticket {
 - **Pricing:** Giá vé với độ chính xác 2 chữ số thập phân
 - **Sale Period:** Thời gian mở bán và kết thúc bán vé
 - **Status Control:** ACTIVE → INACTIVE → SOLD_OUT
+- **Description:** Mô tả chi tiết cho từng loại vé
 
 ---
 
@@ -179,6 +195,7 @@ model Order {
 - **Status Flow:** PENDING → RESERVED → PAID → CANCELLED/EXPIRED
 - **Timeout Management:** `reserved_until` cho auto-cancel sau 15 phút
 - **Multi-event Orders:** Một order có thể chứa vé từ nhiều event
+- **Organization Isolation:** Mỗi order thuộc về organization cụ thể
 
 ### 📦 Order Items
 ```sql
@@ -225,6 +242,7 @@ model Payment {
 - **Transaction Tracking:** Lưu transaction ID từ payment provider
 - **Status Management:** PENDING → SUCCESS/FAILED → REFUNDED
 - **Currency Support:** Mặc định VND, có thể mở rộng
+- **Amount Precision:** Độ chính xác 2 chữ số thập phân
 
 ---
 
@@ -349,6 +367,105 @@ enum PaymentStatus {
 
 ---
 
+## 🗑️ **Những Model đã bị LOẠI BỎ (có thể thêm lại sau):**
+
+### 📊 **Analytics & Tracking**
+```sql
+-- Đã bỏ: TrackingVisit
+model TrackingVisit {
+  id           Int      @id @default(autoincrement())
+  user_id      String?
+  event_id     Int
+  utm_source   String?
+  utm_medium   String?
+  utm_campaign String?
+  utm_content  String?
+  referrer_url String?
+  landing_page String?
+}
+```
+
+### 🎫 **Promotion System**
+```sql
+-- Đã bỏ: PromoCode & OrderPromo
+model PromoCode {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique
+  description     String?
+  discount_type   String
+  discount_value  Decimal
+  max_uses        Int      @default(1)
+  uses            Int      @default(0)
+  valid_from      DateTime?
+  valid_until     DateTime?
+  is_active       Boolean  @default(true)
+}
+
+model OrderPromo {
+  id               Int       @id @default(autoincrement())
+  order_id         Int
+  promo_code_id    Int
+  discount_applied Decimal
+}
+```
+
+### 🔗 **Referral System**
+```sql
+-- Đã bỏ: ReferralCode
+model ReferralCode {
+  id         Int      @id @default(autoincrement())
+  user_id    String
+  code       String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now())
+}
+```
+
+### ⚙️ **Configuration System**
+```sql
+-- Đã bỏ: WebhookSubscription & EventSetting
+model WebhookSubscription {
+  id              Int      @id @default(autoincrement())
+  organization_id Int
+  target_url      String
+  event_type      String
+  is_active       Boolean  @default(true)
+}
+
+model EventSetting {
+  id            Int      @id @default(autoincrement())
+  event_id      Int
+  setting_key   String
+  setting_value String
+}
+```
+
+### 📁 **File Management**
+```sql
+-- Đã bỏ: Image & ImageLink
+model Image {
+  id           Int      @id @default(autoincrement())
+  file_path    String
+  file_name    String?
+  file_type    String?
+  file_size    Int?
+  alt_text     String?
+  uploaded_by  String
+}
+
+model ImageLink {
+  id              Int      @id @default(autoincrement())
+  image_id        Int
+  entity_type     String
+  entity_id       Int
+  organization_id Int?
+  event_id        Int?
+  usage_type      String
+}
+```
+
+---
+
 ## 🔒 Security & Data Isolation
 
 ### 🛡️ Multi-tenant Security
@@ -419,5 +536,20 @@ DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/pos
 - **Audit Tables:** Change tracking
 - **Soft Deletes:** Archive instead of delete
 - **Partitioning:** Large table optimization
+
+### 🎯 **Lý Do Loại Bỏ Các Model:**
+
+1. **Simplification:** Focus vào core ticketing functionality
+2. **MVP Approach:** Start simple, add complexity incrementally
+3. **Performance:** Giảm complexity cho initial deployment
+4. **Maintenance:** Dễ maintain và debug hơn
+
+### 🔄 **Có thể thêm lại sau:**
+- **Promo codes:** Khi cần marketing features
+- **Referral system:** Khi cần viral growth
+- **Analytics tracking:** Khi cần business intelligence
+- **Webhook management:** Khi cần third-party integrations
+- **File management:** Khi cần advanced media handling
+- **Event settings:** Khi cần flexible configuration
 
 **🎯 Goal:** Scalable, secure, multi-tenant ticketing platform với full audit trail và real-time capabilities. 
