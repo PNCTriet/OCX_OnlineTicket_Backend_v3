@@ -15,21 +15,21 @@
 ---
 
 ## 🔐 Phase 2: Authorization & User/Organization
-- [ ] Enum roles: USER, ADMIN_ORGANIZER, OWNER_ORGANIZER, SUPERADMIN
-- [ ] Guard kiểm tra phân quyền theo từng API
-- [ ] Decorator `@Roles()` cho controller
-- [ ] Module users: CRUD user, mapping supabase_id
-- [ ] Module organizations: CRUD tổ chức, phân quyền
-- [ ] API: `/users`, `/organizations`, `/user-organizations`
+- [x] Enum roles: USER, ADMIN_ORGANIZER, OWNER_ORGANIZER, SUPERADMIN
+- [x] Guard kiểm tra phân quyền theo từng API
+- [x] Decorator `@Roles()` cho controller
+- [x] Module users: CRUD user, mapping supabase_id
+- [x] Module organizations: CRUD tổ chức, phân quyền
+- [x] API: `/users`, `/organizations`, `/user-organizations`
 
 ---
 
 ## 🎫 Phase 3: Event & Ticket Management
-- [ ] Module events: CRUD sự kiện
-  - [ ] API: `GET /events`, `GET /events/:id`, `POST /events`, `PUT /events/:id`, `DELETE /events/:id`
-- [ ] Module tickets: CRUD vé sự kiện
-  - [ ] API: `GET /events/:id/tickets`, `POST /tickets`, `PUT /tickets/:id`, `DELETE /tickets/:id`
-- [ ] Quản lý số lượng vé, thời gian mở bán, trạng thái vé
+- [x] Module events: CRUD sự kiện
+  - [x] API: `GET /events`, `GET /events/:id`, `POST /events`, `PUT /events/:id`, `DELETE /events/:id`
+- [x] Module tickets: CRUD vé sự kiện
+  - [x] API: `GET /tickets`, `GET /tickets/:id`, `POST /tickets`, `PUT /tickets/:id`, `DELETE /tickets/:id`, `GET /tickets/event/:event_id`
+- [x] Quản lý số lượng vé, thời gian mở bán, trạng thái vé
 
 ---
 

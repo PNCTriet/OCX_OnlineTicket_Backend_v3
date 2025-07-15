@@ -63,6 +63,8 @@ model User {
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
 
+  role        UserRole @default(USER)
+
   // Relationships
   user_organizations UserOrganization[]
   orders            Order[]
