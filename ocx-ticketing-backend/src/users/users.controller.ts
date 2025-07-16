@@ -24,6 +24,11 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
+  @Get('by-supabase/:uuid')
+  findBySupabaseId(@Param('uuid') uuid: string) {
+    return this.usersService.findBySupabaseId(uuid);
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
     return this.usersService.update(id, updateUserDto);

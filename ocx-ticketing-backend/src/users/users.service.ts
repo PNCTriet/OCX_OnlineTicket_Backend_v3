@@ -40,6 +40,10 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
+  async findBySupabaseId(supabase_id: string) {
+    return this.prisma.user.findUnique({ where: { supabase_id } });
+  }
+
   async update(id: string, data: UpdateUserDto) {
     return this.prisma.user.update({ where: { id }, data });
   }

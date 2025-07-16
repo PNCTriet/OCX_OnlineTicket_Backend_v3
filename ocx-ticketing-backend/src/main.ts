@@ -15,6 +15,12 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
+  // Bật CORS cho mọi domain (phát triển local)
+  app.enableCors({
+    origin: true, // hoặc ['http://localhost:3001']
+    credentials: true, // nếu cần gửi cookie
+  });
+
   await app.listen(3000);
 }
 bootstrap();

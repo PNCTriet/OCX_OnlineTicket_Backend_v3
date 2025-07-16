@@ -34,10 +34,11 @@
 ---
 
 ## 🧾 Phase 4: Order & Booking
-- [ ] Module orders: tạo đơn hàng, kiểm tra tồn kho
-  - [ ] API: `POST /orders`, `GET /orders/:id`, `POST /orders/:id/cancel`
-- [ ] Tạm giữ vé (`reserved_until`), huỷ đơn tự động nếu timeout
-- [ ] Quản lý trạng thái đơn: PENDING, RESERVED, PAID, CANCELLED, EXPIRED
+- [x] Module orders: tạo đơn hàng, kiểm tra tồn kho
+  - [x] API: `POST /orders`, `GET /orders/:id`, `POST /orders/:id/cancel`, `GET /orders`
+- [x] Tạm giữ vé (`reserved_until`), huỷ đơn tự động nếu timeout
+- [x] Quản lý trạng thái đơn: PENDING, RESERVED, PAID, CANCELLED, EXPIRED
+- [x] Logic nghiệp vụ: kiểm tra tồn kho, transaction, hoàn trả vé khi huỷ
 
 ---
 
