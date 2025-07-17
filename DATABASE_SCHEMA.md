@@ -18,7 +18,7 @@
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │     Users       │    │  Organizations   │    │     Events      │
 │                 │    │                  │    │                 │
-│ - supabase_id   │◄──►│ - name          │◄──►│ - title         │
+│ - supabase_id   │◄──►│ - name           │◄──►│ - title         │
 │ - email         │    │ - description    │    │ - location      │
 │ - first_name    │    │ - contact_email  │    │ - start_date    │
 │ - last_name     │    │ - phone          │    │ - end_date      │

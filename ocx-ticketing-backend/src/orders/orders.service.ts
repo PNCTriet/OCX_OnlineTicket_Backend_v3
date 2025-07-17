@@ -1,6 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { OrderStatus } from '@prisma/client';
+import { UserRole } from '../auth/roles.enum';
+import { PaymentStatus } from '@prisma/client';
 
 interface OrderItemData {
   ticket_id: string;
@@ -104,6 +106,7 @@ export class OrdersService {
             ticket: true,
           },
         },
+        payments: true, // Bổ sung payments
       },
     });
 
@@ -156,8 +159,20 @@ export class OrdersService {
     return { message: 'Order cancelled successfully' };
   }
 
-  async getAllOrders(user_id?: string) {
-    const where = user_id ? { user_id } : {};
+  async getAllOrders(user_id?: string, role?: UserRole) {
+    let where = {};
+    
+    // Logic phân quyền
+    if (role === UserRole.USER) {
+      // USER chỉ xem order của mình
+      where = { user_id };
+    } else if (role === UserRole.ADMIN_ORGANIZER || role === UserRole.OWNER_ORGANIZER || role === UserRole.SUPERADMIN) {
+      // ADMIN/OWNER/SUPERADMIN xem tất cả order (có thể thêm filter theo organization sau)
+      where = {};
+    } else {
+      // Mặc định USER nếu không có role
+      where = { user_id };
+    }
     
     return this.prisma.order.findMany({
       where,
@@ -170,10 +185,331 @@ export class OrdersService {
             ticket: true,
           },
         },
+        payments: true, // Bổ sung payments
       },
       orderBy: {
         created_at: 'desc',
       },
     });
   }
+
+  // CRUD cho Order Items
+  async getOrderItems(orderId: string) {
+    const orderItems = await this.prisma.orderItem.findMany({
+      where: { order_id: orderId },
+      include: {
+        ticket: true,
+      },
+    });
+
+    if (!orderItems.length) {
+      throw new NotFoundException(`No order items found for order ${orderId}`);
+    }
+
+    return orderItems;
+  }
+
+  async createOrderItem(orderId: string, data: {
+    ticket_id: string;
+    quantity: number;
+  }) {
+    // Kiểm tra order tồn tại
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order ${orderId} not found`);
+    }
+
+    // Kiểm tra ticket tồn tại và có đủ số lượng
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: data.ticket_id },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException(`Ticket ${data.ticket_id} not found`);
+    }
+
+    if (ticket.status !== 'ACTIVE') {
+      throw new BadRequestException(`Ticket ${ticket.name} is not active`);
+    }
+
+    if (ticket.total_qty - ticket.sold_qty < data.quantity) {
+      throw new BadRequestException(`Insufficient tickets for ${ticket.name}`);
+    }
+
+    // Tạo order item với transaction
+    const orderItem = await this.prisma.$transaction(async (prisma) => {
+      // Tạo order item
+      const newOrderItem = await prisma.orderItem.create({
+        data: {
+          order_id: orderId,
+          ticket_id: data.ticket_id,
+          quantity: data.quantity,
+          price: ticket.price,
+        },
+        include: {
+          ticket: true,
+        },
+      });
+
+      // Cập nhật số lượng đã bán
+      await prisma.ticket.update({
+        where: { id: data.ticket_id },
+        data: {
+          sold_qty: {
+            increment: data.quantity,
+          },
+        },
+      });
+
+      // Cập nhật tổng tiền order
+      const totalAmount = Number(order.total_amount) + (Number(ticket.price) * data.quantity);
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          total_amount: totalAmount,
+        },
+      });
+
+      return newOrderItem;
+    });
+
+    return orderItem;
+  }
+
+  async updateOrderItem(orderId: string, itemId: string, data: {
+    quantity?: number;
+  }) {
+    // Kiểm tra order item tồn tại
+    const orderItem = await this.prisma.orderItem.findFirst({
+      where: { 
+        id: itemId,
+        order_id: orderId,
+      },
+      include: {
+        ticket: true,
+      },
+    });
+
+    if (!orderItem) {
+      throw new NotFoundException(`Order item ${itemId} not found`);
+    }
+
+    // Nếu có thay đổi quantity
+    if (data.quantity && data.quantity !== orderItem.quantity) {
+      const ticket = await this.prisma.ticket.findUnique({
+        where: { id: orderItem.ticket_id },
+      });
+
+      if (!ticket) {
+        throw new NotFoundException(`Ticket ${orderItem.ticket_id} not found`);
+      }
+
+      const quantityDiff = data.quantity - orderItem.quantity;
+      
+      if (ticket.total_qty - ticket.sold_qty < quantityDiff) {
+        throw new BadRequestException(`Insufficient tickets for ${ticket.name}`);
+      }
+
+      // Cập nhật với transaction
+      const updatedOrderItem = await this.prisma.$transaction(async (prisma) => {
+        // Cập nhật order item
+        const updated = await prisma.orderItem.update({
+          where: { id: itemId },
+          data: {
+            quantity: data.quantity,
+          },
+          include: {
+            ticket: true,
+          },
+        });
+
+        // Cập nhật số lượng đã bán
+        await prisma.ticket.update({
+          where: { id: orderItem.ticket_id },
+          data: {
+            sold_qty: {
+              increment: quantityDiff,
+            },
+          },
+        });
+
+        // Cập nhật tổng tiền order
+        const order = await prisma.order.findUnique({
+          where: { id: orderId },
+        });
+
+        if (order) {
+          const totalAmount = Number(order.total_amount) + (Number(ticket.price) * quantityDiff);
+          await prisma.order.update({
+            where: { id: orderId },
+            data: {
+              total_amount: totalAmount,
+            },
+          });
+        }
+
+        return updated;
+      });
+
+      return updatedOrderItem;
+    }
+
+    return orderItem;
+  }
+
+  async deleteOrderItem(orderId: string, itemId: string) {
+    // Kiểm tra order item tồn tại
+    const orderItem = await this.prisma.orderItem.findFirst({
+      where: { 
+        id: itemId,
+        order_id: orderId,
+      },
+      include: {
+        ticket: true,
+      },
+    });
+
+    if (!orderItem) {
+      throw new NotFoundException(`Order item ${itemId} not found`);
+    }
+
+    // Xóa với transaction
+    await this.prisma.$transaction(async (prisma) => {
+      // Xóa order item
+      await prisma.orderItem.delete({
+        where: { id: itemId },
+      });
+
+      // Hoàn trả số lượng đã bán
+      await prisma.ticket.update({
+        where: { id: orderItem.ticket_id },
+        data: {
+          sold_qty: {
+            decrement: orderItem.quantity,
+          },
+        },
+      });
+
+      // Cập nhật tổng tiền order
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+      });
+
+      if (order) {
+        const totalAmount = Number(order.total_amount) - (Number(orderItem.price) * orderItem.quantity);
+        await prisma.order.update({
+          where: { id: orderId },
+          data: {
+            total_amount: totalAmount,
+          },
+        });
+      }
+    });
+
+    return { message: 'Order item deleted successfully' };
+  }
+
+  // CRUD cho Payments
+  async getOrderPayments(orderId: string) {
+    const payments = await this.prisma.payment.findMany({
+      where: { order_id: orderId },
+    });
+
+    if (!payments.length) {
+      throw new NotFoundException(`No payments found for order ${orderId}`);
+    }
+
+    return payments;
+  }
+
+  async createPayment(orderId: string, data: {
+    amount: number;
+    payment_method: string;
+    transaction_id?: string;
+    status: string;
+  }) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+  
+    if (!isValidPaymentStatus(data.status)) {
+      throw new BadRequestException(`Invalid payment status: ${data.status}`);
+    }
+  
+    const payment = await this.prisma.payment.create({
+      data: {
+        order_id: orderId,
+        amount: data.amount,
+        payment_method: data.payment_method,
+        transaction_id: data.transaction_id,
+        status: data.status as PaymentStatus,
+      },
+    });
+  
+    return payment;
+  }
+  
+
+  async updatePayment(orderId: string, paymentId: string, data: {
+    amount?: number;
+    payment_method?: string;
+    transaction_id?: string;
+    status?: string;
+  }) {
+    const payment = await this.prisma.payment.findFirst({
+      where: { id: paymentId, order_id: orderId },
+    });
+  
+    if (!payment) {
+      throw new NotFoundException(`Payment ${paymentId} not found`);
+    }
+  
+    const updateData: any = {
+      amount: data.amount,
+      payment_method: data.payment_method,
+      transaction_id: data.transaction_id,
+    };
+  
+    if (data.status) {
+      if (!isValidPaymentStatus(data.status)) {
+        throw new BadRequestException(`Invalid payment status: ${data.status}`);
+      }
+      updateData.status = data.status as PaymentStatus;
+    }
+  
+    const updatedPayment = await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: updateData,
+    });
+  
+    return updatedPayment;
+  }
+  
+
+  async deletePayment(orderId: string, paymentId: string) {
+    // Kiểm tra payment tồn tại
+    const payment = await this.prisma.payment.findFirst({
+      where: { 
+        id: paymentId,
+        order_id: orderId,
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException(`Payment ${paymentId} not found`);
+    }
+
+    // Xóa payment
+    await this.prisma.payment.delete({
+      where: { id: paymentId },
+    });
+
+    return { message: 'Payment deleted successfully' };
+  }
+}
+
+function isValidPaymentStatus(status: string): status is PaymentStatus {
+  return Object.values(PaymentStatus).includes(status as PaymentStatus);
 }

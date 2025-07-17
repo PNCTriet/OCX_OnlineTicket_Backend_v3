@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, ExecutionContext } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PrismaService } from '../prisma.service';
+import { UserRole } from './roles.enum';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -42,7 +43,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
             last_name: user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || null,
             avatar_url: user.user_metadata?.avatar_url || null,
             is_verified: user.email_confirmed_at ? true : false,
-            role: 'USER', // Default role
+            // role sẽ được set default trong schema Prisma
           }
         });
       }

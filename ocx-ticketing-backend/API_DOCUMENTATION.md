@@ -924,6 +924,142 @@ curl -X GET http://localhost:3000/orders \
 
 ---
 
+### 6.9. CRUD Order Items
+
+#### Lấy danh sách order items
+- **GET** `/orders/{orderId}/items`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Response:**
+```json
+[
+  {
+    "id": "order_item_id",
+    "order_id": "order_id",
+    "ticket_id": "ticket_id",
+    "quantity": 2,
+    "price": 1000000,
+    "ticket": { "id": "ticket_id", "name": "Vé VIP" }
+  }
+]
+```
+
+#### Thêm order item
+- **POST** `/orders/{orderId}/items`
+- **Body:**
+```json
+{
+  "ticket_id": "ticket_id",
+  "quantity": 2
+}
+```
+- **Response:**
+```json
+{
+  "id": "order_item_id",
+  "order_id": "order_id",
+  "ticket_id": "ticket_id",
+  "quantity": 2,
+  "price": 1000000,
+  "ticket": { "id": "ticket_id", "name": "Vé VIP" }
+}
+```
+
+#### Sửa order item
+- **PATCH** `/orders/{orderId}/items/{itemId}`
+- **Body:**
+```json
+{
+  "quantity": 3
+}
+```
+- **Response:**
+```json
+{
+  "id": "order_item_id",
+  "quantity": 3,
+  ...
+}
+```
+
+#### Xoá order item
+- **DELETE** `/orders/{orderId}/items/{itemId}`
+- **Response:**
+```json
+{ "message": "Order item deleted successfully" }
+```
+
+### 6.10. CRUD Payments
+
+#### Lấy danh sách payments
+- **GET** `/orders/{orderId}/payments`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Response:**
+```json
+[
+  {
+    "id": "payment_id",
+    "order_id": "order_id",
+    "amount": 2000000,
+    "payment_method": "STRIPE",
+    "transaction_id": "txn_123456",
+    "status": "SUCCESS"
+  }
+]
+```
+
+#### Thêm payment
+- **POST** `/orders/{orderId}/payments`
+- **Body:**
+```json
+{
+  "amount": 2000000,
+  "payment_method": "STRIPE",
+  "transaction_id": "txn_123456",
+  "status": "SUCCESS"
+}
+```
+- **Response:**
+```json
+{
+  "id": "payment_id",
+  "order_id": "order_id",
+  "amount": 2000000,
+  "payment_method": "STRIPE",
+  "transaction_id": "txn_123456",
+  "status": "SUCCESS"
+}
+```
+
+#### Sửa payment
+- **PATCH** `/orders/{orderId}/payments/{paymentId}`
+- **Body:**
+```json
+{
+  "status": "FAILED"
+}
+```
+- **Response:**
+```json
+{
+  "id": "payment_id",
+  "status": "FAILED",
+  ...
+}
+```
+
+#### Xoá payment
+- **DELETE** `/orders/{orderId}/payments/{paymentId}`
+- **Response:**
+```json
+{ "message": "Payment deleted successfully" }
+```
+
+### 6.11. Lưu ý phân quyền
+- Tất cả các API CRUD order_items và payments đều yêu cầu JWT, phân quyền role như API orders.
+- USER chỉ thao tác với order của mình, ADMIN/OWNER/SUPERADMIN thao tác với tất cả.
+
+---
+
 ## 7. Dashboard & Báo cáo API
 
 > Thống kê hệ thống, tổ chức, sự kiện, xuất báo cáo PDF/CSV, gửi email báo cáo.
