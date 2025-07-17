@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PassportModule } from '@nestjs/passport';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -7,9 +8,19 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { EventsModule } from './events/events.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { OrdersModule } from './orders/orders.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
-  imports: [AuthModule, UsersModule, OrganizationsModule, EventsModule, TicketsModule, OrdersModule],
+  imports: [
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    AuthModule, 
+    UsersModule, 
+    OrganizationsModule, 
+    EventsModule, 
+    TicketsModule, 
+    OrdersModule, 
+    DashboardModule
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

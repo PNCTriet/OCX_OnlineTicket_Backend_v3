@@ -1,18 +1,49 @@
 import { Controller, Get, Req, UseGuards, Post, Body } from '@nestjs/common';
-import { SupabaseJwtGuard } from './supabase-jwt.guard';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { CurrentUser } from './current-user.decorator';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
-import { ApiBody } from '@nestjs/swagger';
+import { ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+
+interface AuthenticatedRequest extends Request {
+  user: any;
+  userLocal: any;
+}
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @UseGuards(SupabaseJwtGuard)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get('me')
-  getMe(@Req() req: Request) {
+  getMe(@CurrentUser() userLocal: any) {
     return {
-      supabaseUser: req['supabaseUser'],
+      user: userLocal, // Trả về user local thay vì JWT payload
+    };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('sync-profile')
+  async syncProfile(@CurrentUser() userLocal: any, @Req() req: AuthenticatedRequest) {
+    // Sync user data from Supabase to local database
+    const supabaseUser = req.user;
+    
+    const updatedUser = await this.authService.syncUserProfile(
+      userLocal.id,
+      {
+        email: supabaseUser.email,
+        first_name: supabaseUser.user_metadata?.full_name?.split(' ')[0] || null,
+        last_name: supabaseUser.user_metadata?.full_name?.split(' ').slice(1).join(' ') || null,
+        avatar_url: supabaseUser.user_metadata?.avatar_url || null,
+        is_verified: supabaseUser.email_confirmed_at ? true : false,
+      }
+    );
+
+    return {
+      message: 'Profile synced successfully',
+      user: updatedUser
     };
   }
 
@@ -25,12 +56,7 @@ export class AuthController {
         password: { type: 'string', example: 'yourpassword' },
       },
       required: ['email', 'password'],
-      example: {
-        email: 'user@example.com',
-        password: 'yourpassword',
-      },
     },
-    description: 'Đăng nhập với email và password Supabase',
   })
   async login(@Body() body: { email: string; password: string }) {
     return this.authService.login(body.email, body.password);
@@ -45,28 +71,15 @@ export class AuthController {
         password: { type: 'string', example: 'yourpassword' },
       },
       required: ['email', 'password'],
-      example: {
-        email: 'user@example.com',
-        password: 'yourpassword',
-      },
     },
-    description: 'Đăng ký tài khoản mới với email và password Supabase',
   })
   async register(@Body() body: { email: string; password: string }) {
     return this.authService.register(body.email, body.password);
   }
 
-  @UseGuards(SupabaseJwtGuard)
   @Post('logout')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      example: {},
-    },
-    description: 'Logout không cần body, chỉ cần access token. Có thể gửi object rỗng {}.',
-  })
-  async logout(@Req() req: Request) {
-    return this.authService.logout(req['supabaseUser']);
+  async logout() {
+    return { message: 'Logged out successfully' };
   }
 
   @Post('refresh')
@@ -77,11 +90,7 @@ export class AuthController {
         refresh_token: { type: 'string', example: 'your_refresh_token' },
       },
       required: ['refresh_token'],
-      example: {
-        refresh_token: 'your_refresh_token',
-      },
     },
-    description: 'Lấy access token mới từ refresh token',
   })
   async refresh(@Body() body: { refresh_token: string }) {
     return this.authService.refreshToken(body.refresh_token);

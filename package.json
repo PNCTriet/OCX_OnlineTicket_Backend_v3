@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/swagger": "^11.2.0",
     "axios": "^1.10.0",

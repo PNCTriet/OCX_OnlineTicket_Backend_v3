@@ -74,4 +74,23 @@ export class AuthService {
       user: data.user,
     };
   }
+
+  async syncUserProfile(userId: string, profileData: {
+    email: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    avatar_url?: string | null;
+    is_verified?: boolean;
+  }) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        email: profileData.email,
+        first_name: profileData.first_name,
+        last_name: profileData.last_name,
+        avatar_url: profileData.avatar_url,
+        is_verified: profileData.is_verified,
+      },
+    });
+  }
 }

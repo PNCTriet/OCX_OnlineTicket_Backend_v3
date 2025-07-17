@@ -1,6 +1,35 @@
 # 📚 API Documentation
 
-Tài liệu tổng hợp tất cả các API của hệ thống (bao gồm Auth và các module khác).
+> **Lưu ý về xác thực:**
+> - Hệ thống sử dụng xác thực JWT chuẩn HS256 (Legacy JWT Secret của Supabase).
+> - Biến môi trường: `SUPABASE_JWT_SECRET` (bắt buộc), `SUPABASE_JWT_ALGORITHM=HS256` (mặc định).
+> - Tất cả các API bảo vệ (orders, dashboard, ...) đều yêu cầu header:
+>   `Authorization: Bearer <ACCESS_TOKEN>`
+> - Để lấy access token, hãy đăng nhập qua `/auth/login` và dùng giá trị `access_token` trả về.
+> - **Swagger UI:** Truy cập `http://localhost:3000/api/docs` để test API với giao diện web
+> - **Authorize trong Swagger:** Click nút "Authorize" (🔒) và nhập `Bearer <ACCESS_TOKEN>`
+> - Trong các ví dụ cURL bên dưới, hãy thay `<ACCESS_TOKEN>` bằng token thực tế của bạn.
+
+---
+
+## 🔐 **Authentication Flow**
+
+### 1. **Login để lấy JWT Token:**
+```bash
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "trietnguyenpham@gmail.com", "password": "123123"}'
+```
+
+### 2. **Authorize trong Swagger:**
+- Vào `http://localhost:3000/api/docs`
+- Click nút **"Authorize"** (🔒)
+- Nhập: `Bearer YOUR_JWT_TOKEN`
+- Click "Authorize" → "Close"
+
+### 3. **Test API với JWT:**
+- Tất cả API có biểu tượng 🔒 sẽ tự động gửi JWT token
+- Không cần nhập token thủ công cho từng request
 
 ---
 
@@ -64,9 +93,14 @@ curl -X POST http://localhost:3000/auth/register \
 - Nếu thành công:
 ```json
 {
-  "access_token": "...",
-  "refresh_token": "...",
-  "user": { ... }
+  "access_token": "eyJhbGciOiJIUzI1NiIsImtpZCI6IkFMYVBndjVpNjN6VnFNZjEiLCJ0eXAiOiJKV1QifQ...",
+  "refresh_token": "2kez5k7pqefy",
+  "user": {
+    "id": "bddbe590-ab98-41c1-94cb-737300695027",
+    "email": "trietnguyenpham@gmail.com",
+    "role": "authenticated",
+    ...
+  }
 }
 ```
 - Nếu lỗi:
@@ -97,7 +131,16 @@ curl -X POST http://localhost:3000/auth/login \
 - Nếu token hợp lệ:
 ```json
 {
-  "supabaseUser": { ... }
+  "user": {
+    "id": "cmd4rgj6g0000jk44y1fhwyl1",
+    "supabase_id": "bddbe590-ab98-41c1-94cb-737300695027",
+    "email": "trietnguyenpham@gmail.com",
+    "first_name": null,
+    "last_name": null,
+    "role": "USER",
+    "created_at": "2025-07-16T07:58:53.085Z",
+    "updated_at": "2025-07-16T19:28:21.293Z"
+  }
 }
 ```
 - Nếu token không hợp lệ:
@@ -231,7 +274,7 @@ curl -X POST http://localhost:3000/auth/register \
 ```sh
 curl -X POST http://localhost:3000/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"testuser1@example.com","password":"Test@1234"}'
+  -d '{"email":"trietnguyenpham@gmail.com","password":"123123"}'
 ```
 
 ### Lấy thông tin user hiện tại
@@ -260,6 +303,7 @@ curl -X POST http://localhost:3000/auth/logout \
 - Sau khi đăng ký, user cần xác nhận email (check email để activate tài khoản).
 - Access token có thời hạn, nếu hết hạn cần dùng refresh token để lấy token mới.
 - Sau khi logout, token sẽ không còn hiệu lực.
+- **Swagger UI:** Tất cả API protected đều có biểu tượng 🔒 và yêu cầu authorize trước khi test.
 
 ---
 
@@ -602,16 +646,12 @@ curl -X POST http://localhost:3000/auth/logout \
 #### Request Body
 ```json
 {
-  "organization_id": "org_cuid",
-  "event_id": "event_cuid",
+  "organization_id": "cmd5g7d2w0003v78sdjha8onv",
+  "event_id": "cmd5gmqgp0005v78s79bina9z",
   "items": [
     {
-      "ticket_id": "ticket_cuid",
+      "ticket_id": "cmd5gug760007v78s3vxefcmd",
       "quantity": 2
-    },
-    {
-      "ticket_id": "ticket_cuid_2", 
-      "quantity": 1
     }
   ]
 }
@@ -621,15 +661,15 @@ curl -X POST http://localhost:3000/auth/logout \
 - Nếu thành công:
 ```json
 {
-  "id": "order_cuid",
-  "user_id": "user_cuid",
-  "organization_id": "org_cuid",
-  "event_id": "event_cuid",
-  "total_amount": 2500000,
+  "id": "cmd6ctsyr0001jkhlwwr0dsis",
+  "user_id": "cmd4rgj6g0000jk44y1fhwyl1",
+  "organization_id": "cmd5g7d2w0003v78sdjha8onv",
+  "event_id": "cmd5gmqgp0005v78s79bina9z",
+  "total_amount": "2000000",
   "status": "PENDING",
-  "reserved_until": "2025-07-15T10:30:00.000Z",
-  "created_at": "2025-07-15T10:15:00.000Z",
-  "updated_at": "2025-07-15T10:15:00.000Z"
+  "reserved_until": "2025-07-16T19:43:43.490Z",
+  "created_at": "2025-07-16T19:28:43.491Z",
+  "updated_at": "2025-07-16T19:28:43.491Z"
 }
 ```
 
@@ -640,6 +680,7 @@ curl -X POST http://localhost:3000/auth/logout \
 - ✅ **Transaction:** Đảm bảo consistency khi tạo order + cập nhật sold_qty
 - ✅ **Tạm giữ vé:** `reserved_until = now + 15 phút`
 - ✅ **Cập nhật sold_qty:** Tăng số lượng đã bán ngay khi tạo order
+- ⚠️ **TODO:** Tự động chuyển PENDING → EXPIRED sau 15 phút
 
 #### Test cURL
 ```sh
@@ -647,10 +688,10 @@ curl -X POST http://localhost:3000/orders \
   -H "Authorization: Bearer <ACCESS_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
-    "organization_id": "org_cuid",
-    "event_id": "event_cuid", 
+    "organization_id": "cmd5g7d2w0003v78sdjha8onv",
+    "event_id": "cmd5gmqgp0005v78s79bina9z",
     "items": [
-      {"ticket_id": "ticket_cuid", "quantity": 2}
+      {"ticket_id": "cmd5gug760007v78s3vxefcmd", "quantity": 2}
     ]
   }'
 ```
@@ -668,37 +709,37 @@ curl -X POST http://localhost:3000/orders \
 #### Response
 ```json
 {
-  "id": "order_cuid",
-  "user_id": "user_cuid",
-  "organization_id": "org_cuid",
-  "event_id": "event_cuid",
-  "total_amount": 2500000,
+  "id": "cmd6ctsyr0001jkhlwwr0dsis",
+  "user_id": "cmd4rgj6g0000jk44y1fhwyl1",
+  "organization_id": "cmd5g7d2w0003v78sdjha8onv",
+  "event_id": "cmd5gmqgp0005v78s79bina9z",
+  "total_amount": "2000000",
   "status": "PENDING",
-  "reserved_until": "2025-07-15T10:30:00.000Z",
-  "created_at": "2025-07-15T10:15:00.000Z",
-  "updated_at": "2025-07-15T10:15:00.000Z",
+  "reserved_until": "2025-07-16T19:43:43.490Z",
+  "created_at": "2025-07-16T19:28:43.491Z",
+  "updated_at": "2025-07-16T19:28:43.491Z",
   "user": {
-    "id": "user_cuid",
-    "email": "user@example.com",
-    "first_name": "Nguyen",
-    "last_name": "Van A"
+    "id": "cmd4rgj6g0000jk44y1fhwyl1",
+    "email": "trietnguyenpham@gmail.com",
+    "first_name": null,
+    "last_name": null
   },
   "organization": {
-    "id": "org_cuid",
+    "id": "cmd5g7d2w0003v78sdjha8onv",
     "name": "Howls Studio"
   },
   "event": {
-    "id": "event_cuid",
+    "id": "cmd5gmqgp0005v78s79bina9z",
     "title": "Sự kiện âm nhạc Howls"
   },
   "order_items": [
     {
       "id": "order_item_cuid",
-      "ticket_id": "ticket_cuid",
+      "ticket_id": "cmd5gug760007v78s3vxefcmd",
       "quantity": 2,
       "price": 1000000,
       "ticket": {
-        "id": "ticket_cuid",
+        "id": "cmd5gug760007v78s3vxefcmd",
         "name": "Vé VIP",
         "description": "Ghế VIP gần sân khấu"
       }
@@ -709,7 +750,7 @@ curl -X POST http://localhost:3000/orders \
 
 #### Test cURL
 ```sh
-curl -X GET http://localhost:3000/orders/order_cuid \
+curl -X GET http://localhost:3000/orders/cmd6ctsyr0001jkhlwwr0dsis \
   -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
@@ -739,7 +780,7 @@ curl -X GET http://localhost:3000/orders/order_cuid \
 
 #### Test cURL
 ```sh
-curl -X POST http://localhost:3000/orders/order_cuid/cancel \
+curl -X POST http://localhost:3000/orders/cmd6ctsyr0001jkhlwwr0dsis/cancel \
   -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
@@ -757,13 +798,13 @@ curl -X POST http://localhost:3000/orders/order_cuid/cancel \
 ```json
 [
   {
-    "id": "order_cuid",
-    "user_id": "user_cuid",
-    "organization_id": "org_cuid",
-    "total_amount": 2500000,
+    "id": "cmd6ctsyr0001jkhlwwr0dsis",
+    "user_id": "cmd4rgj6g0000jk44y1fhwyl1",
+    "organization_id": "cmd5g7d2w0003v78sdjha8onv",
+    "total_amount": "2000000",
     "status": "PENDING",
-    "reserved_until": "2025-07-15T10:30:00.000Z",
-    "created_at": "2025-07-15T10:15:00.000Z",
+    "reserved_until": "2025-07-16T19:43:43.490Z",
+    "created_at": "2025-07-16T19:28:43.491Z",
     "user": { ... },
     "organization": { ... },
     "event": { ... },
@@ -844,23 +885,23 @@ curl -X POST http://localhost:3000/orders \
   -H "Authorization: Bearer <ACCESS_TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
-    "organization_id": "org_cuid",
-    "event_id": "event_cuid",
+    "organization_id": "cmd5g7d2w0003v78sdjha8onv",
+    "event_id": "cmd5gmqgp0005v78s79bina9z",
     "items": [
-      {"ticket_id": "ticket_cuid", "quantity": 2}
+      {"ticket_id": "cmd5gug760007v78s3vxefcmd", "quantity": 2}
     ]
   }'
 ```
 
 #### Xem chi tiết đơn hàng:
 ```sh
-curl -X GET http://localhost:3000/orders/order_cuid \
+curl -X GET http://localhost:3000/orders/cmd6ctsyr0001jkhlwwr0dsis \
   -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
 #### Huỷ đơn hàng:
 ```sh
-curl -X POST http://localhost:3000/orders/order_cuid/cancel \
+curl -X POST http://localhost:3000/orders/cmd6ctsyr0001jkhlwwr0dsis/cancel \
   -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
@@ -879,7 +920,224 @@ curl -X GET http://localhost:3000/orders \
 - **Concurrent access:** Hệ thống xử lý được nhiều user cùng mua vé (tránh oversell)
 - **Inventory check:** Kiểm tra tồn kho nghiêm ngặt trước khi tạo order
 - **Hoàn trả vé:** Khi huỷ order, số lượng vé được hoàn trả về ban đầu
+- **⚠️ TODO:** Cần implement scheduled task để tự động chuyển PENDING → EXPIRED sau 15 phút
 
 ---
 
-## [Các module khác sẽ bổ sung tại đây] 
+## 7. Dashboard & Báo cáo API
+
+> Thống kê hệ thống, tổ chức, sự kiện, xuất báo cáo PDF/CSV, gửi email báo cáo.
+
+---
+
+### 7.1. Thống kê tổng quan hệ thống
+- **GET** `/dashboard/system`
+- **Header:**
+  - `Authorization: Bearer <ACCESS_TOKEN>`
+- **Response:**
+```json
+{
+  "total_revenue": 100000000,
+  "total_tickets_sold": 5000,
+  "total_orders": 2000,
+  "total_events": 50,
+  "total_organizations": 10
+}
+```
+
+### 7.2. Thống kê tổ chức
+- **GET** `/dashboard/organization/:id`
+- **Header:**
+  - `Authorization: Bearer <ACCESS_TOKEN>`
+- **Response:**
+```json
+{
+  "organization_id": "org_cuid",
+  "total_revenue": 50000000,
+  "total_tickets_sold": 2000,
+  "total_orders": 800,
+  "total_events": 10
+}
+```
+
+### 7.3. Thống kê tổ chức theo thời gian
+- **GET** `/dashboard/organization/:id/time?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=day|week|month`
+- **Header:**
+  - `Authorization: Bearer <ACCESS_TOKEN>`
+- **Response:**
+```json
+[
+  { "time": "2025-08-01", "revenue": 1000000, "tickets_sold": 50 },
+  { "time": "2025-08-02", "revenue": 2000000, "tickets_sold": 100 }
+]
+```
+
+### 7.4. Xuất báo cáo tổ chức PDF
+- **GET** `/dashboard/organization/:id/export/pdf?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=day|week|month`
+- **Header:**
+  - `Authorization: Bearer <ACCESS_TOKEN>`
+- **Response:**
+  - File PDF báo cáo thống kê tổ chức (download)
+
+### 7.5. Xuất báo cáo tổ chức CSV
+- **GET** `/dashboard/organization/:id/export/csv?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=day|week|month`
+- **Header:**
+  - `Authorization: Bearer <ACCESS_TOKEN>`
+- **Response:**
+  - File CSV báo cáo thống kê tổ chức (download)
+
+### 7.6. Gửi báo cáo tổ chức qua email
+- **POST** `/dashboard/organization/:id/send-report`
+- **Header:**
+  - `Authorization: Bearer <ACCESS_TOKEN>`
+- **Body:**
+```json
+{
+  "email": "recipient@example.com", // Địa chỉ email nhận báo cáo (bắt buộc)
+  "from": "2025-08-01",            // Ngày bắt đầu thống kê (bắt buộc)
+  "to": "2025-08-31",              // Ngày kết thúc thống kê (bắt buộc)
+  "groupBy": "day",                // Nhóm theo: day|week|month (mặc định: day)
+  "format": "csv"                  // Định dạng: csv|pdf (mặc định: csv)
+}
+```
+- **Response:**
+```json
+{
+  "message": "Email sent successfully"
+}
+```
+- **Lưu ý:**
+  - Trường `email` là bắt buộc, hệ thống sẽ gửi báo cáo tới địa chỉ này.
+  - Nếu không nhập email sẽ không biết gửi cho ai.
+  - Các trường `from`, `to` là bắt buộc để xác định khoảng thời gian thống kê.
+  - `groupBy` và `format` là tuỳ chọn.
+
+- **Test cURL:**
+```sh
+curl -X POST http://localhost:3000/dashboard/organization/org_cuid/send-report \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "recipient@example.com",
+    "from": "2025-08-01",
+    "to": "2025-08-31",
+    "groupBy": "day",
+    "format": "csv"
+  }'
+```
+
+### 7.7. Thống kê sự kiện
+- **GET** `/dashboard/event/:id`
+- **Header:**
+  - `Authorization: Bearer <ACCESS_TOKEN>`
+- **Response:**
+```json
+{
+  "event_id": "event_cuid",
+  "total_revenue": 10000000,
+  "total_tickets_sold": 500,
+  "total_orders": 200
+}
+```
+
+### 7.8. Thống kê sự kiện theo thời gian
+- **GET** `/dashboard/event/:id/time?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=day|week|month`
+- **Header:**
+  - `Authorization: Bearer <ACCESS_TOKEN>`
+- **Response:**
+```json
+[
+  { "time": "2025-08-01", "revenue": 100000, "tickets_sold": 10 },
+  { "time": "2025-08-02", "revenue": 200000, "tickets_sold": 20 }
+]
+```
+
+---
+
+## 🔧 **Swagger UI Integration**
+
+### Truy cập Swagger UI:
+- **URL:** `http://localhost:3000/api/docs`
+- **Features:**
+  - ✅ Tất cả API endpoints được document đầy đủ
+  - ✅ Request/Response examples cho từng API
+  - ✅ Authorize button để test với JWT token
+  - ✅ Try it out functionality cho mọi endpoint
+  - ✅ Auto-generated API documentation
+
+### Cách sử dụng Swagger:
+1. **Login để lấy token:**
+   - Vào `POST /auth/login`
+   - Click "Try it out"
+   - Nhập email/password
+   - Copy `access_token` từ response
+
+2. **Authorize:**
+   - Click nút "Authorize" (🔒) ở góc trên bên phải
+   - Nhập: `Bearer YOUR_JWT_TOKEN`
+   - Click "Authorize" → "Close"
+
+3. **Test API:**
+   - Tất cả API có biểu tượng 🔒 sẽ tự động gửi JWT token
+   - Click "Try it out" trên bất kỳ endpoint nào
+   - Nhập parameters nếu cần
+   - Click "Execute"
+
+---
+
+## 📊 **Current Status**
+
+### ✅ **Completed Features:**
+- Authentication & Authorization (JWT + Supabase)
+- User & Organization CRUD
+- Event & Ticket Management
+- Order Creation & Management
+- Dashboard & Analytics
+- PDF/CSV Export
+- Email Report Sending
+- Swagger UI Integration
+
+### 🔄 **In Progress:**
+- Order Expiration System (scheduled task)
+
+### ⏳ **Pending:**
+- Payment Gateway Integration
+- QR Code Generation
+- Check-in System
+- Webhook System
+- Unit Testing
+
+---
+
+## 🚀 **Quick Start Guide**
+
+### 1. **Setup Environment:**
+```bash
+cp env.example .env
+# Fill in your Supabase credentials
+```
+
+### 2. **Install Dependencies:**
+```bash
+npm install
+```
+
+### 3. **Setup Database:**
+```bash
+npx prisma generate
+npx prisma migrate dev
+```
+
+### 4. **Start Development Server:**
+```bash
+npm run start:dev
+```
+
+### 5. **Access Swagger UI:**
+- Open: `http://localhost:3000/api/docs`
+- Login via `POST /auth/login`
+- Authorize with JWT token
+- Test all APIs
+
+---
+
+**🎯 Next Steps:** Implement order expiration system to complete the core business logic. 

@@ -11,6 +11,7 @@
 - [x] Tích hợp Supabase Auth, tạo Auth module, JWT guard
 - [x] Xây dựng API: `/auth/register`, `/auth/login`, `/auth/me`
 - [x] Viết tài liệu API (API_DOCUMENTATION.md)
+- [x] Sửa lỗi JWT authentication và mapping user local
 
 ---
 
@@ -21,6 +22,7 @@
 - [x] Module users: CRUD user, mapping supabase_id
 - [x] Module organizations: CRUD tổ chức, phân quyền
 - [x] API: `/users`, `/organizations`, `/user-organizations`
+- [x] Thêm `@ApiBearerAuth()` cho tất cả protected endpoints
 
 ---
 
@@ -39,6 +41,8 @@
 - [x] Tạm giữ vé (`reserved_until`), huỷ đơn tự động nếu timeout
 - [x] Quản lý trạng thái đơn: PENDING, RESERVED, PAID, CANCELLED, EXPIRED
 - [x] Logic nghiệp vụ: kiểm tra tồn kho, transaction, hoàn trả vé khi huỷ
+- [ ] **TODO:** Implement scheduled task để tự động chuyển PENDING → EXPIRED sau 15 phút
+- [ ] **TODO:** Thêm cron job hoặc BullMQ queue để xử lý order expiration
 
 ---
 
@@ -67,10 +71,14 @@
 ---
 
 ## 📊 Phase 8: Dashboard & Analytics
-- [ ] Module dashboard: tổng quan doanh thu, vé bán, hiệu suất sự kiện
-  - [ ] API: `/dashboard/organization/:id`, `/dashboard/event/:id`
-- [ ] Thống kê theo tổ chức, sự kiện, khung giờ
-- [ ] Export CSV, PDF, gửi báo cáo qua email
+- [x] Module dashboard: tổng quan doanh thu, vé bán, hiệu suất sự kiện
+  - [x] API: `/dashboard/system`, `/dashboard/organization/:id`, `/dashboard/event/:id`
+- [x] Thống kê theo tổ chức, sự kiện, khung giờ (nâng cao)
+- [x] Export PDF báo cáo dashboard tổ chức
+  - [x] API: `/dashboard/organization/:id/export/pdf`
+- [x] Export CSV, gửi báo cáo qua email
+  - [x] API: `/dashboard/organization/:id/export/csv`
+  - [x] API: `/dashboard/organization/:id/send-report`
 
 ---
 
@@ -82,11 +90,35 @@
 ---
 
 ## 🛠️ Phase 10: DevOps, Testing, Documentation
+- [x] Tích hợp Swagger cho API docs
+- [x] Chuẩn hoá README, tài liệu API
 - [ ] Viết unit test, e2e test cho các module chính
-- [ ] Tích hợp Swagger cho API docs
-- [ ] Chuẩn hoá README, tài liệu API, hướng dẫn deploy
 - [ ] Checklist production: env, SSL, domain, monitoring, backup
 
 ---
 
-**Mỗi phase có thể chia nhỏ thành các task cụ thể hơn khi triển khai thực tế.** 
+## 🔧 **CURRENT FOCUS - Cần làm ngay:**
+
+### 1. **Order Expiration System** (Ưu tiên cao)
+- [ ] Tạo scheduled task để tự động chuyển PENDING → EXPIRED
+- [ ] Implement cron job hoặc BullMQ queue
+- [ ] Test logic expiration với order thực tế
+
+### 2. **Payment Integration** (Ưu tiên trung bình)
+- [ ] Tích hợp Stripe payment gateway
+- [ ] Implement webhook để cập nhật order status
+- [ ] Test payment flow end-to-end
+
+### 3. **QR Code Generation** (Ưu tiên thấp)
+- [ ] Sinh QR code cho order items
+- [ ] Upload lên Supabase Storage
+- [ ] Attach vào confirmation email
+
+---
+
+**📊 Progress Summary:**
+- ✅ **Completed:** 7/10 phases (70%)
+- 🔄 **In Progress:** Order expiration system
+- ⏳ **Pending:** Payment, QR, Check-in, Webhook, Testing
+
+**🎯 Next Milestone:** Hoàn thành order expiration system để đảm bảo business logic hoàn chỉnh. 

@@ -1,14 +1,22 @@
 import { Controller, Get, Post, Body, Param, UseGuards, Req } from '@nestjs/common';
 import { OrdersService } from './orders.service';
-import { SupabaseJwtGuard } from '../auth/supabase-jwt.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { Request } from 'express';
-import { ApiBody } from '@nestjs/swagger';
+import { ApiBody, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
+interface AuthenticatedRequest extends Request {
+  user: any;
+  userLocal: any;
+}
+
+@ApiTags('orders')
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
-  @UseGuards(SupabaseJwtGuard)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Post()
   @ApiBody({
     schema: {
@@ -51,32 +59,33 @@ export class OrdersController {
       ticket_id: string;
       quantity: number;
     }>;
-  }, @Req() req: Request) {
-    const user_id = req['supabaseUser'].sub; // Lấy user_id từ JWT
+  }, @CurrentUser() userLocal: any) {
     return this.ordersService.createOrder({
-      user_id,
+      user_id: userLocal.id, // Lấy user_id từ user local
       organization_id: body.organization_id,
       event_id: body.event_id,
       items: body.items,
     });
   }
 
-  @UseGuards(SupabaseJwtGuard)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get(':id')
   async getOrder(@Param('id') id: string) {
     return this.ordersService.getOrder(id);
   }
 
-  @UseGuards(SupabaseJwtGuard)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Post(':id/cancel')
   async cancelOrder(@Param('id') id: string) {
     return this.ordersService.cancelOrder(id);
   }
 
-  @UseGuards(SupabaseJwtGuard)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @Get()
-  async getAllOrders(@Req() req: Request) {
-    const user_id = req['supabaseUser'].sub; // Lấy user_id từ JWT
-    return this.ordersService.getAllOrders(user_id);
+  async getAllOrders(@CurrentUser() userLocal: any) {
+    return this.ordersService.getAllOrders(userLocal.id); // Lấy user_id từ user local
   }
 }
