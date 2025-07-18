@@ -83,14 +83,18 @@ export class PaymentsService {
         },
       });
 
-      // 3. Update order status
+      // 3. Update order status và bỏ reservation timeout
       await this.prisma.order.update({
         where: { id: order.id },
         data: { 
           status: OrderStatus.PAID,
           paid_at: new Date(),
+          reserved_until: null, // Bỏ reservation timeout để tránh bị expire
         },
       });
+
+      // Sinh mã code cho order_item_code khi order PAID
+      await (global as any).ordersService.generateOrderItemCodesForOrder?.(order.id);
 
       return {
         success: true,
@@ -237,12 +241,13 @@ export class PaymentsService {
       },
     });
 
-    // Update order status
+    // Update order status và bỏ reservation timeout
     await this.prisma.order.update({
       where: { id: orderId },
       data: {
         status: OrderStatus.PAID,
         paid_at: new Date(),
+        reserved_until: null, // Bỏ reservation timeout để tránh bị expire
       },
     });
 

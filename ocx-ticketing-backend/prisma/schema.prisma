@@ -191,13 +191,27 @@ model OrderItem {
   ticket_id String
   quantity  Int
   price     Decimal @db.Decimal(10, 2)
-  qr_code   String? // URL to QR code image
 
   // Relationships
   order  Order  @relation(fields: [order_id], references: [id], onDelete: Cascade)
   ticket Ticket @relation(fields: [ticket_id], references: [id])
+  codes  OrderItemCode[]
 
   @@map("order_items")
+}
+
+model OrderItemCode {
+  id            String    @id @default(cuid())
+  order_item_id String
+  code          String    // Mã QR unique cho từng vé
+  used          Boolean   @default(false) // Đã checkin chưa
+  created_at    DateTime  @default(now()) // Ngày tạo code
+  used_at       DateTime? // Thời điểm code được sử dụng
+  active        Boolean   @default(true)  // Cho phép sử dụng mã code
+
+  order_item    OrderItem @relation(fields: [order_item_id], references: [id], onDelete: Cascade)
+
+  @@map("order_item_codes")
 }
 
 // Payment Model

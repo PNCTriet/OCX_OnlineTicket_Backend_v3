@@ -71,7 +71,7 @@ export class OrdersService {
         },
       });
 
-      // Tạo order items và generate QR codes
+      // Tạo order items (KHÔNG sinh QR code ở đây)
       const createdOrderItems: OrderItem[] = [];
       for (const item of orderItems) {
         const createdOrderItem = await prisma.orderItem.create({
@@ -82,9 +82,7 @@ export class OrdersService {
             price: item.price,
           },
         });
-
         createdOrderItems.push(createdOrderItem);
-
         // Cập nhật số lượng đã bán
         await prisma.ticket.update({
           where: { id: item.ticket_id },
@@ -95,49 +93,14 @@ export class OrdersService {
           },
         });
       }
-
       return { order: newOrder, orderItems: createdOrderItems };
     });
 
-    // Generate QR codes cho tất cả order items
-    try {
-      const qrPromises = order.orderItems.map(async (orderItem: OrderItem) => {
-        const ticket = await this.prisma.ticket.findUnique({
-          where: { id: orderItem.ticket_id },
-        });
-
-        const qrUrl = await this.qrService.generateAndUploadQR(
-          order.order.id,
-          orderItem.id,
-          orderItem.ticket_id,
-          orderItem.quantity,
-          ticket?.name || 'Unknown Ticket'
-        );
-
-        // Cập nhật QR code URL vào order item
-        await this.prisma.orderItem.update({
-          where: { id: orderItem.id },
-          data: { qr_code: qrUrl },
-        });
-
-        return {
-          orderItemId: orderItem.id,
-          qrUrl,
-        };
-      });
-
-      const qrResults = await Promise.all(qrPromises);
-      console.log(`Generated ${qrResults.length} QR codes for order ${order.order.id}`);
-
-      return {
-        ...order.order,
-        qrCodes: qrResults,
-      };
-    } catch (error) {
-      console.error('Error generating QR codes:', error);
-      // Vẫn trả về order ngay cả khi generate QR thất bại
-      return order.order;
-    }
+    // Đảm bảo không còn logic cập nhật qr_code nào nữa
+    return {
+      ...order.order,
+      qrCodes: [], // Trả về một mảng rỗng vì không còn mã QR
+    };
   }
 
   async getOrder(id: string) {
@@ -150,6 +113,7 @@ export class OrdersService {
         order_items: {
           include: {
             ticket: true,
+            codes: true, // Trả về danh sách mã QR cho từng order_item
           },
         },
         payments: true, // Bổ sung payments
@@ -471,29 +435,44 @@ export class OrdersService {
     return payments;
   }
 
-  async createPayment(orderId: string, data: {
-    amount: number;
-    payment_method: string;
-    transaction_id?: string;
-    status: string;
-  }) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
-    if (!order) throw new NotFoundException(`Order ${orderId} not found`);
-  
-    if (!isValidPaymentStatus(data.status)) {
-      throw new BadRequestException(`Invalid payment status: ${data.status}`);
-    }
-  
+  async createPayment(orderId: string, data: any) {
+    // Tạo payment record với đủ trường như Sepay webhook
     const payment = await this.prisma.payment.create({
       data: {
         order_id: orderId,
         amount: data.amount,
+        currency: data.currency || 'VND',
         payment_method: data.payment_method,
+        status: data.status,
         transaction_id: data.transaction_id,
-        status: data.status as PaymentStatus,
+        gateway: data.gateway,
+        transaction_date: data.transactionDate ? new Date(data.transactionDate) : undefined,
+        account_number: data.accountNumber,
+        sub_account: data.subAccount,
+        code: data.code,
+        content: data.content,
+        transfer_type: data.transferType,
+        description: data.description,
+        transfer_amount: data.transferAmount,
+        reference_code: data.referenceCode,
+        accumulated: data.accumulated,
+        sepay_id: data.sepay_id,
       },
     });
-  
+
+    // Nếu status là SUCCESS thì update order sang PAID và sinh mã QR code
+    if (data.status === 'SUCCESS') {
+      await this.prisma.order.update({
+        where: { id: orderId },
+        data: {
+          status: 'PAID',
+          paid_at: new Date(),
+          reserved_until: null,
+        },
+      });
+      await this.generateOrderItemCodesForOrder(orderId);
+    }
+
     return payment;
   }
   
@@ -637,6 +616,38 @@ export class OrdersService {
       isExpired: false,
       reservedUntil: order.reserved_until,
     };
+  }
+
+  // Hàm sinh order_item_code cho order đã PAID
+  async generateOrderItemCodesForOrder(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { order_items: true },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    for (const item of order.order_items) {
+      // Nếu đã có code rồi thì bỏ qua
+      const existingCodes = await this.prisma.orderItemCode.count({ where: { order_item_id: item.id } });
+      if (existingCodes >= item.quantity) continue;
+      for (let i = existingCodes; i < item.quantity; i++) {
+        const qrData = this.qrService['generateQRData'](
+          order.id,
+          item.id,
+          item.ticket_id,
+          1
+        );
+        const code = JSON.parse(qrData).hash;
+        await this.prisma.orderItemCode.create({
+          data: {
+            order_item_id: item.id,
+            code,
+            used: false,
+            created_at: new Date(),
+            active: true,
+          },
+        });
+      }
+    }
   }
 
   // Scheduled task: Tự động expire orders mỗi 5 phút

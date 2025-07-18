@@ -6,11 +6,13 @@ import { QRService } from './qr.service';
 import { CheckinService } from './checkin.service';
 import { PrismaModule } from '../prisma.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { OrderItemCodeController } from './order-item-code.controller';
+import { OrderItemCodeService } from './order-item-code.service';
 
 @Module({
-  imports: [PrismaModule, ScheduleModule.forRoot()],
-  controllers: [OrdersController, CheckinController],
-  providers: [OrdersService, QRService, CheckinService],
+  imports: [PrismaModule],
+  controllers: [OrdersController, CheckinController, OrderItemCodeController],
+  providers: [OrdersService, QRService, CheckinService, OrderItemCodeService],
   exports: [OrdersService, QRService, CheckinService],
 })
 export class OrdersModule {}

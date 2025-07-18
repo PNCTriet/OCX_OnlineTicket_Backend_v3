@@ -708,6 +708,7 @@ curl -X POST http://localhost:3000/auth/logout \
 
 #### Header
 - `Authorization: Bearer <ACCESS_TOKEN>`
+- **Required Role:** `USER` (cho phép tạo order)
 
 #### Request Body
 ```json
@@ -771,6 +772,7 @@ curl -X POST http://localhost:3000/orders \
 
 #### Header
 - `Authorization: Bearer <ACCESS_TOKEN>`
+- **Required Role:** `ADMIN_ORGANIZER`, `OWNER_ORGANIZER`, `SUPERADMIN`
 
 #### Response
 ```json
@@ -829,6 +831,7 @@ curl -X GET http://localhost:3000/orders/cmd6ctsyr0001jkhlwwr0dsis \
 
 #### Header
 - `Authorization: Bearer <ACCESS_TOKEN>`
+- **Required Role:** `ADMIN_ORGANIZER`, `OWNER_ORGANIZER`, `SUPERADMIN`
 
 #### Response
 - Nếu thành công:
@@ -859,6 +862,7 @@ curl -X POST http://localhost:3000/orders/cmd6ctsyr0001jkhlwwr0dsis/cancel \
 
 #### Header
 - `Authorization: Bearer <ACCESS_TOKEN>`
+- **Required Role:** `ADMIN_ORGANIZER`, `OWNER_ORGANIZER`, `SUPERADMIN`
 
 #### Response
 ```json
@@ -1065,6 +1069,7 @@ Nhận webhook từ Sepay gateway khi có thanh toán thành công
 #### Endpoint
 - **GET** `/payments/order/:orderId`
 - **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Required Role:** `ADMIN_ORGANIZER`, `OWNER_ORGANIZER`, `SUPERADMIN`
 
 #### Response
 ```json
@@ -1103,6 +1108,7 @@ Nhận webhook từ Sepay gateway khi có thanh toán thành công
 #### Endpoint
 - **GET** `/payments/match/:orderId`
 - **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Required Role:** `ADMIN_ORGANIZER`, `OWNER_ORGANIZER`, `SUPERADMIN`
 
 #### Description
 Match thủ công payment với order (khi webhook không tự động match được)
@@ -1192,6 +1198,7 @@ curl -X GET http://localhost:3000/payments/match/order_cuid \
 #### Endpoint
 - **GET** `/payments/unmatched`
 - **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Required Role:** `ADMIN_ORGANIZER`, `OWNER_ORGANIZER`, `SUPERADMIN`
 - **Query Parameters:**
   - `limit` (optional): Số lượng records trả về (default: 50)
   - `offset` (optional): Số lượng records bỏ qua (default: 0)
@@ -1438,10 +1445,15 @@ curl -X GET http://localhost:3000/payments/match/order_cuid \
 
 ### 8.1. QR Code Generation
 
-#### Tự động generate khi tạo order
-- QR codes được tự động generate khi tạo order
-- Upload lên Supabase Storage với public URL
-- Lưu QR code URL vào `order_item.qr_code`
+#### Sinh QR code khi order PAID
+- QR codes **chỉ được generate khi order chuyển sang trạng thái PAID (đã thanh toán thành công)**
+- Không sinh mã code khi tạo order (PENDING/RESERVED)
+- Mỗi vé (order_item) sẽ có n mã code (n = quantity)
+- Lưu vào bảng con `order_item_codes` với các trường:
+  - `code`: mã QR unique
+  - `used`: đã checkin chưa
+  - `active`: cho phép sử dụng mã code (default true)
+  - `created_at`, `used_at`
 
 #### QR Code Data Structure
 ```json
@@ -1449,7 +1461,7 @@ curl -X GET http://localhost:3000/payments/match/order_cuid \
   "orderId": "cmd6ctsyr0001jkhlwwr0dsis",
   "orderItemId": "item_123",
   "ticketId": "ticket_456",
-  "quantity": 2,
+  "quantity": 1,
   "timestamp": 1640995200000,
   "hash": "cmd6ctsyr0001jkhlwwr0dsis_item_123_1640995200000_abc123"
 }
@@ -1771,3 +1783,76 @@ npm run start:dev
 ---
 
 **🎯 Next Steps:** Implement Payment Gateway Integration (Phase 5) và Webhook System (Phase 9) để hoàn thiện hệ thống. 
+
+---
+
+## 9. Order Item Codes API (SUPERADMIN only)
+
+> Quản lý mã QR từng vé (order_item_code). Chỉ SUPERADMIN được quyền thao tác.
+
+### 9.1. Lấy danh sách mã code
+- **GET** `/order-item-codes`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Query:** `orderItemId` (tùy chọn, lọc theo order_item_id)
+- **Required Role:** `SUPERADMIN`
+- **Response:**
+```json
+[
+  {
+    "id": "code_id",
+    "order_item_id": "order_item_id",
+    "code": "OCX123456",
+    "used": false,
+    "created_at": "2025-07-18T10:00:00.000Z",
+    "used_at": null
+  }
+]
+```
+
+### 9.2. Xem chi tiết mã code
+- **GET** `/order-item-codes/:id`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Required Role:** `SUPERADMIN`
+- **Response:**
+```json
+{
+  "id": "code_id",
+  "order_item_id": "order_item_id",
+  "code": "OCX123456",
+  "used": false,
+  "created_at": "2025-07-18T10:00:00.000Z",
+  "used_at": null
+}
+```
+
+### 9.3. Cập nhật trạng thái mã code
+- **PATCH** `/order-item-codes/:id`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Required Role:** `SUPERADMIN`
+- **Body:**
+```json
+{
+  "used": true,
+  "used_at": "2025-07-18T12:00:00.000Z"
+}
+```
+- **Response:**
+```json
+{
+  "id": "code_id",
+  "used": true,
+  "used_at": "2025-07-18T12:00:00.000Z",
+  ...
+}
+```
+
+### 9.4. Xóa mã code
+- **DELETE** `/order-item-codes/:id`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Required Role:** `SUPERADMIN`
+- **Response:**
+```json
+{ "message": "OrderItemCode deleted successfully" }
+```
+
+--- 

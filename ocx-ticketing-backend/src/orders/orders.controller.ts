@@ -1,9 +1,11 @@
 import { Controller, Get, Post, Body, Param, UseGuards, Req, Patch, Delete } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RoleGuard, Roles } from '../auth/role.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Request } from 'express';
-import { ApiBody, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBody, ApiTags, ApiBearerAuth, ApiResponse, ApiOperation } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
 
 interface AuthenticatedRequest extends Request {
   user: any;
@@ -68,31 +70,45 @@ export class OrdersController {
     });
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RoleGuard)
+  @Roles(UserRole.ADMIN_ORGANIZER, UserRole.OWNER_ORGANIZER, UserRole.SUPERADMIN)
   @ApiBearerAuth()
   @Get(':id')
+  @ApiOperation({ summary: 'Get order by ID (Admin/Organizer only)' })
+  @ApiResponse({ status: 200, description: 'Order retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied. Admin/Organizer role required.' })
   async getOrder(@Param('id') id: string) {
     return this.ordersService.getOrder(id);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RoleGuard)
+  @Roles(UserRole.ADMIN_ORGANIZER, UserRole.OWNER_ORGANIZER, UserRole.SUPERADMIN)
   @ApiBearerAuth()
   @Post(':id/cancel')
+  @ApiOperation({ summary: 'Cancel order (Admin/Organizer only)' })
+  @ApiResponse({ status: 200, description: 'Order cancelled successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied. Admin/Organizer role required.' })
   async cancelOrder(@Param('id') id: string) {
     return this.ordersService.cancelOrder(id);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RoleGuard)
+  @Roles(UserRole.ADMIN_ORGANIZER, UserRole.OWNER_ORGANIZER, UserRole.SUPERADMIN)
   @ApiBearerAuth()
   @Get()
+  @ApiOperation({ summary: 'Get all orders (Admin/Organizer only)' })
+  @ApiResponse({ status: 200, description: 'All orders retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied. Admin/Organizer role required.' })
   async getAllOrders(@CurrentUser() userLocal: any) {
     return this.ordersService.getAllOrders(userLocal.id, userLocal.role); // Truyền cả user_id và role
   }
 
   // API để expire orders hết hạn (admin only)
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RoleGuard)
+  @Roles(UserRole.ADMIN_ORGANIZER, UserRole.OWNER_ORGANIZER, UserRole.SUPERADMIN)
   @ApiBearerAuth()
   @Post('expire-expired')
+  @ApiResponse({ status: 403, description: 'Access denied. Admin/Organizer role required.' })
   async expireExpiredOrders() {
     return this.ordersService.expireExpiredOrders();
   }
@@ -192,28 +208,47 @@ export class OrdersController {
       type: 'object',
       properties: {
         amount: { type: 'number', example: 1000000 },
-        payment_method: { type: 'string', example: 'STRIPE' },
-        transaction_id: { type: 'string', example: 'txn_123456' },
+        payment_method: { type: 'string', example: 'sepay' },
         status: { type: 'string', example: 'SUCCESS' },
+        transaction_id: { type: 'string', example: 'FT25195113530033' },
+        gateway: { type: 'string', example: 'VPBank' },
+        transactionDate: { type: 'string', example: '2025-07-14 16:41:00' },
+        accountNumber: { type: 'string', example: '214244527' },
+        subAccount: { type: 'string', example: null },
+        code: { type: 'string', example: 'OCX4140716404' },
+        content: { type: 'string', example: 'NHAN TU ...' },
+        transferType: { type: 'string', example: 'in' },
+        description: { type: 'string', example: 'BankAPINotify ...' },
+        transferAmount: { type: 'number', example: 1000000 },
+        referenceCode: { type: 'string', example: 'FT25195113530033' },
+        accumulated: { type: 'number', example: 0 },
+        sepay_id: { type: 'number', example: 17673873 },
       },
       required: ['amount', 'payment_method', 'status'],
       example: {
         amount: 1000000,
-        payment_method: 'STRIPE',
-        transaction_id: 'txn_123456',
+        payment_method: 'sepay',
         status: 'SUCCESS',
+        transaction_id: 'FT25195113530033',
+        gateway: 'VPBank',
+        transactionDate: '2025-07-14 16:41:00',
+        accountNumber: '214244527',
+        subAccount: null,
+        code: 'OCX4140716404',
+        content: 'NHAN TU ...',
+        transferType: 'in',
+        description: 'BankAPINotify ...',
+        transferAmount: 1000000,
+        referenceCode: 'FT25195113530033',
+        accumulated: 0,
+        sepay_id: 17673873,
       },
     },
-    description: 'Thêm payment cho order.',
+    description: 'Tạo payment cho order. Nếu status=SUCCESS sẽ tự động update order sang PAID và sinh mã QR code vé.',
   })
   async createPayment(
     @Param('orderId') orderId: string,
-    @Body() data: {
-      amount: number;
-      payment_method: string;
-      transaction_id?: string;
-      status: string;
-    },
+    @Body() data: any,
   ) {
     return this.ordersService.createPayment(orderId, data);
   }

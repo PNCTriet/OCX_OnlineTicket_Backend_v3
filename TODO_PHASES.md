@@ -6,23 +6,55 @@
 ---
 
 ## 🚀 Phase 1: Project Setup & Authentication
-- [x] Khởi tạo project NestJS, cài đặt Prisma, Supabase, cấu hình env
-- [x] Thiết lập schema, migration, kết nối database
-- [x] Tích hợp Supabase Auth, tạo Auth module, JWT guard
-- [x] Xây dựng API: `/auth/register`, `/auth/login`, `/auth/me`
-- [x] Viết tài liệu API (API_DOCUMENTATION.md)
-- [x] Sửa lỗi JWT authentication và mapping user local
+
+### 📦 Initial Setup
+- [x] **Initialize NestJS project**
+  - [x] `nest new ocx-ticketing-backend`
+  - [x] Install dependencies: `@nestjs/swagger`, `@nestjs/config`, `@nestjs/bull`
+  - [ ] Setup TypeScript config và ESLint
+
+- [x] **Database Setup**
+  - [x] Install Prisma: `npm install prisma @prisma/client`
+  - [x] Initialize Prisma: `npx prisma init`
+  - [ ] Configure Supabase connection trong `prisma/schema.prisma`
+  - [ ] Setup environment variables cho DATABASE_URL
+
+- [ ] **Supabase Integration**
+  - [ ] Create Supabase project
+  - [ ] Setup database schema (users, organizations, user_organizations)
+  - [ ] Configure RLS policies
+  - [ ] Setup Supabase Auth
+
+### 🔐 Authentication Module
+- [ ] **Create auth module**
+  - [ ] `nest g module auth`
+  - [ ] `nest g service auth`
+  - [ ] `nest g controller auth`
+
+- [ ] **JWT Middleware**
+  - [ ] Create JWT decode middleware
+  - [ ] Extract user info từ Supabase JWT
+  - [ ] Map `supabase_id` sang local user
+  - [ ] Inject user context vào request
+
+- [ ] **User Mapping**
+  - [ ] Create users table với `supabase_id` field
+  - [ ] Auto-create user khi login lần đầu
+  - [ ] Sync user data từ Supabase Auth
 
 ---
 
-## 🔐 Phase 2: Authorization & User/Organization
-- [x] Enum roles: USER, ADMIN_ORGANIZER, OWNER_ORGANIZER, SUPERADMIN
-- [x] Guard kiểm tra phân quyền theo từng API
-- [x] Decorator `@Roles()` cho controller
-- [x] Module users: CRUD user, mapping supabase_id
-- [x] Module organizations: CRUD tổ chức, phân quyền
-- [x] API: `/users`, `/organizations`, `/user-organizations`
-- [x] Thêm `@ApiBearerAuth()` cho tất cả protected endpoints
+## 🚦 Phase 2: Vé điện tử & QR Code
+- [x] **Order/OrderItem CRUD**
+- [x] **Sinh QR code cho từng vé (order_item_code)**
+  - [x] Chỉ sinh code khi order chuyển sang PAID
+  - [x] Không sinh code khi tạo order (PENDING/RESERVED)
+  - [x] Mỗi vé (quantity) là 1 mã code riêng
+  - [x] Lưu vào bảng con order_item_codes
+  - [x] Trường active (default true), used, used_at, created_at
+- [x] **API CRUD cho order_item_code** (chỉ SUPERADMIN)
+- [x] **API checkin sử dụng order_item_code**
+- [x] **Swagger & API doc cho order_item_code**
 
 ---
 
