@@ -9,6 +9,7 @@ import { EventsModule } from './events/events.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { OrdersModule } from './orders/orders.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -19,7 +20,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     EventsModule, 
     TicketsModule, 
     OrdersModule, 
-    DashboardModule
+    DashboardModule,
+    PaymentsModule
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -89,6 +89,22 @@ export class OrdersController {
     return this.ordersService.getAllOrders(userLocal.id, userLocal.role); // Truyền cả user_id và role
   }
 
+  // API để expire orders hết hạn (admin only)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Post('expire-expired')
+  async expireExpiredOrders() {
+    return this.ordersService.expireExpiredOrders();
+  }
+
+  // API để kiểm tra order có hết hạn không
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get(':id/check-expiration')
+  async checkOrderExpiration(@Param('id') id: string) {
+    return this.ordersService.checkOrderExpiration(id);
+  }
+
   // CRUD cho Order Items
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

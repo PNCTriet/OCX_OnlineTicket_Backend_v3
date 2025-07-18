@@ -1,8 +1,10 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, OrderItem } from '@prisma/client';
 import { UserRole } from '../auth/roles.enum';
 import { PaymentStatus } from '@prisma/client';
+import { Cron, CronExpression } from '@nestjs/schedule';
+import { QRService } from './qr.service';
 
 interface OrderItemData {
   ticket_id: string;
@@ -12,7 +14,10 @@ interface OrderItemData {
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly qrService: QRService,
+  ) {}
 
   async createOrder(data: {
     user_id: string;
@@ -62,13 +67,14 @@ export class OrdersService {
           event_id: data.event_id,
           total_amount: totalAmount,
           status: OrderStatus.PENDING,
-          reserved_until: new Date(Date.now() + 15 * 60 * 1000), // 15 phút
+          reserved_until: new Date(Date.now() + 10 * 60 * 1000), // 10 phút
         },
       });
 
-      // Tạo order items
+      // Tạo order items và generate QR codes
+      const createdOrderItems: OrderItem[] = [];
       for (const item of orderItems) {
-        await prisma.orderItem.create({
+        const createdOrderItem = await prisma.orderItem.create({
           data: {
             order_id: newOrder.id,
             ticket_id: item.ticket_id,
@@ -76,6 +82,8 @@ export class OrdersService {
             price: item.price,
           },
         });
+
+        createdOrderItems.push(createdOrderItem);
 
         // Cập nhật số lượng đã bán
         await prisma.ticket.update({
@@ -88,10 +96,48 @@ export class OrdersService {
         });
       }
 
-      return newOrder;
+      return { order: newOrder, orderItems: createdOrderItems };
     });
 
-    return order;
+    // Generate QR codes cho tất cả order items
+    try {
+      const qrPromises = order.orderItems.map(async (orderItem: OrderItem) => {
+        const ticket = await this.prisma.ticket.findUnique({
+          where: { id: orderItem.ticket_id },
+        });
+
+        const qrUrl = await this.qrService.generateAndUploadQR(
+          order.order.id,
+          orderItem.id,
+          orderItem.ticket_id,
+          orderItem.quantity,
+          ticket?.name || 'Unknown Ticket'
+        );
+
+        // Cập nhật QR code URL vào order item
+        await this.prisma.orderItem.update({
+          where: { id: orderItem.id },
+          data: { qr_code: qrUrl },
+        });
+
+        return {
+          orderItemId: orderItem.id,
+          qrUrl,
+        };
+      });
+
+      const qrResults = await Promise.all(qrPromises);
+      console.log(`Generated ${qrResults.length} QR codes for order ${order.order.id}`);
+
+      return {
+        ...order.order,
+        qrCodes: qrResults,
+      };
+    } catch (error) {
+      console.error('Error generating QR codes:', error);
+      // Vẫn trả về order ngay cả khi generate QR thất bại
+      return order.order;
+    }
   }
 
   async getOrder(id: string) {
@@ -507,6 +553,102 @@ export class OrdersService {
     });
 
     return { message: 'Payment deleted successfully' };
+  }
+
+  // Tự động expire orders hết hạn
+  async expireExpiredOrders() {
+    const now = new Date();
+    
+    // Tìm tất cả orders PENDING/RESERVED đã hết hạn
+    const expiredOrders = await this.prisma.order.findMany({
+      where: {
+        status: {
+          in: [OrderStatus.PENDING, OrderStatus.RESERVED],
+        },
+        reserved_until: {
+          lt: now,
+        },
+      },
+      include: {
+        order_items: true,
+      },
+    });
+
+    console.log(`Found ${expiredOrders.length} expired orders to process`);
+
+    // Xử lý từng expired order
+    for (const order of expiredOrders) {
+      await this.prisma.$transaction(async (prisma) => {
+        // Hoàn trả số lượng vé
+        for (const item of order.order_items) {
+          await prisma.ticket.update({
+            where: { id: item.ticket_id },
+            data: {
+              sold_qty: {
+                decrement: item.quantity,
+              },
+            },
+          });
+        }
+
+        // Cập nhật trạng thái order thành EXPIRED
+        await prisma.order.update({
+          where: { id: order.id },
+          data: {
+            status: OrderStatus.EXPIRED,
+          },
+        });
+
+        console.log(`Expired order ${order.id} and returned ${order.order_items.length} ticket types`);
+      });
+    }
+
+    return {
+      message: `Processed ${expiredOrders.length} expired orders`,
+      expiredCount: expiredOrders.length,
+    };
+  }
+
+  // Kiểm tra order có hết hạn không
+  async checkOrderExpiration(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order ${orderId} not found`);
+    }
+
+    if (order.status === OrderStatus.PENDING || order.status === OrderStatus.RESERVED) {
+      const now = new Date();
+      const isExpired = order.reserved_until && order.reserved_until < now;
+      
+      if (isExpired) {
+        // Tự động expire order này
+        await this.expireExpiredOrders();
+        return {
+          isExpired: true,
+          message: 'Order has expired and tickets have been returned',
+        };
+      }
+    }
+
+    return {
+      isExpired: false,
+      reservedUntil: order.reserved_until,
+    };
+  }
+
+  // Scheduled task: Tự động expire orders mỗi 5 phút
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async handleExpiredOrders() {
+    try {
+      console.log('Running scheduled task: Checking for expired orders...');
+      const result = await this.expireExpiredOrders();
+      console.log(`Scheduled task completed: ${result.message}`);
+    } catch (error) {
+      console.error('Error in scheduled task for expired orders:', error);
+    }
   }
 }
 

@@ -19,6 +19,31 @@ export class EventsService {
     return this.prisma.event.findMany();
   }
 
+  async findByOrganization(organization_id: string) {
+    return this.prisma.event.findMany({
+      where: { organization_id },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            logo_url: true,
+          },
+        },
+        tickets: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            total_qty: true,
+            sold_qty: true,
+            status: true,
+          },
+        },
+      },
+    });
+  }
+
   async findOne(id: string) {
     return this.prisma.event.findUnique({ where: { id } });
   }

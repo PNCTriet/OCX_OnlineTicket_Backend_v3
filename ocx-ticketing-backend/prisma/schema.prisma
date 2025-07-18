@@ -120,6 +120,7 @@ model Event {
   title          String
   description    String?
   location       String?
+  checkin_logs   CheckinLog[]
   start_date     DateTime
   end_date       DateTime
   banner_url     String?
@@ -153,6 +154,7 @@ model Ticket {
   // Relationships
   event       Event        @relation(fields: [event_id], references: [id], onDelete: Cascade)
   order_items OrderItem[]
+  checkin_logs CheckinLog[]
 
   @@map("tickets")
 }
@@ -166,6 +168,7 @@ model Order {
   total_amount   Decimal     @db.Decimal(10, 2)
   status         OrderStatus @default(PENDING)
   reserved_until DateTime?
+  paid_at        DateTime?   // Thời điểm thanh toán thành công
   created_at     DateTime    @default(now())
   updated_at     DateTime    @updatedAt
 
@@ -203,9 +206,24 @@ model Payment {
   order_id      String
   amount        Decimal       @db.Decimal(10, 2)
   currency      String        @default("VND")
-  payment_method String       // "stripe", "momo", etc.
+  payment_method String       // "stripe", "momo", "sepay", etc.
   status        PaymentStatus @default(PENDING)
   transaction_id String?      // External payment provider transaction ID
+  
+  // Sepay specific fields
+  gateway       String?       // "VPBank", "Momo", etc.
+  transaction_date DateTime?   // "2025-07-14 16:41:00"
+  account_number String?      // "214244527"
+  sub_account   String?       // null
+  code          String?       // "OCX4140716404"
+  content       String?       // "NHAN TU 0697044105922 TRACE 714203 ND OCX414071640460109021012"
+  transfer_type String?       // "in"
+  description   String?       // "BankAPINotify NHAN TU 0697044105922 TRACE 714203 ND OCX414071640460109021012"
+  transfer_amount Decimal?    @db.Decimal(10, 2) // 10000
+  reference_code String?      // "FT25195113530033"
+  accumulated   Decimal?      @db.Decimal(10, 2) // 0
+  sepay_id      Int?         // 17673873
+  
   created_at    DateTime      @default(now())
   updated_at    DateTime      @updatedAt
 
@@ -217,16 +235,21 @@ model Payment {
 
 // CheckinLog Model
 model CheckinLog {
-  id        String   @id @default(cuid())
-  order_id  String
-  user_id   String
-  qr_code   String
-  checked_in_at DateTime @default(now())
-  notes     String?
+  id            String   @id @default(cuid())
+  user_id       String
+  ticket_id     String
+  event_id      String
+  order_id      String
+  order_item_id String
+  checkin_time  DateTime @default(now())
+  verified_by   String
+  notes         String?
 
   // Relationships
-  order Order @relation(fields: [order_id], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  ticket    Ticket    @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+  event     Event     @relation(fields: [event_id], references: [id], onDelete: Cascade)
+  order     Order     @relation(fields: [order_id], references: [id], onDelete: Cascade)
 
   @@map("checkin_logs")
 }

@@ -494,11 +494,45 @@ curl -X POST http://localhost:3000/auth/logout \
 
 ### 4.2. Lấy danh sách sự kiện
 - **GET** `/events`
-- **Response:**
+- **Query Parameters:**
+  - `organization_id` (optional): Lọc sự kiện theo tổ chức
+- **Examples:**
+  - `GET /events` - Lấy tất cả sự kiện
+  - `GET /events?organization_id=org_cuid` - Lấy sự kiện của tổ chức cụ thể
+- **Response (tất cả sự kiện):**
 ```json
 [
   { "id": "...", "title": "...", ... },
   ...
+]
+```
+- **Response (theo organization):**
+```json
+[
+  {
+    "id": "...",
+    "title": "Sự kiện âm nhạc Howls",
+    "description": "Đêm nhạc Howls Studio",
+    "location": "Nhà hát Hòa Bình",
+    "start_date": "2025-08-01T19:00:00.000Z",
+    "end_date": "2025-08-01T22:00:00.000Z",
+    "status": "PUBLISHED",
+    "organization": {
+      "id": "org_cuid",
+      "name": "Howls Studio",
+      "logo_url": "https://howls.studio/logo.png"
+    },
+    "tickets": [
+      {
+        "id": "ticket_cuid",
+        "name": "Vé VIP",
+        "price": 1000000,
+        "total_qty": 100,
+        "sold_qty": 50,
+        "status": "ACTIVE"
+      }
+    ]
+  }
 ]
 ```
 
@@ -573,11 +607,43 @@ curl -X POST http://localhost:3000/auth/logout \
 
 ### 5.2. Lấy danh sách vé
 - **GET** `/tickets`
-- **Response:**
+- **Query Parameters:**
+  - `organization_id` (optional): Lọc vé theo tổ chức
+- **Examples:**
+  - `GET /tickets` - Lấy tất cả vé
+  - `GET /tickets?organization_id=org_cuid` - Lấy vé của tổ chức cụ thể
+- **Response (tất cả vé):**
 ```json
 [
   { "id": "...", "name": "...", ... },
   ...
+]
+```
+- **Response (theo organization):**
+```json
+[
+  {
+    "id": "ticket_cuid",
+    "name": "Vé VIP",
+    "description": "Ghế VIP gần sân khấu",
+    "price": 1000000,
+    "total_qty": 100,
+    "sold_qty": 50,
+    "status": "ACTIVE",
+    "event": {
+      "id": "event_cuid",
+      "title": "Sự kiện âm nhạc Howls",
+      "start_date": "2025-08-01T19:00:00.000Z",
+      "end_date": "2025-08-01T22:00:00.000Z",
+      "location": "Nhà hát Hòa Bình",
+      "status": "PUBLISHED",
+      "organization": {
+        "id": "org_cuid",
+        "name": "Howls Studio",
+        "logo_url": "https://howls.studio/logo.png"
+      }
+    }
+  }
 ]
 ```
 
@@ -915,12 +981,14 @@ curl -X GET http://localhost:3000/orders \
 
 ### 6.8. Lưu ý quan trọng
 
-- **Tạm giữ vé:** Order được tạm giữ 15 phút, sau đó tự động huỷ nếu chưa thanh toán
+- **Tạm giữ vé:** Order được tạm giữ 10 phút, sau đó tự động huỷ nếu chưa thanh toán
 - **Transaction:** Tất cả thao tác tạo/huỷ order đều sử dụng database transaction
 - **Concurrent access:** Hệ thống xử lý được nhiều user cùng mua vé (tránh oversell)
 - **Inventory check:** Kiểm tra tồn kho nghiêm ngặt trước khi tạo order
 - **Hoàn trả vé:** Khi huỷ order, số lượng vé được hoàn trả về ban đầu
-- **⚠️ TODO:** Cần implement scheduled task để tự động chuyển PENDING → EXPIRED sau 15 phút
+- **✅ Scheduled task:** Tự động chuyển PENDING → EXPIRED sau 10 phút (cron job mỗi 5 phút)
+- **✅ QR Code Generation:** Tự động generate QR codes cho từng order item
+- **✅ Order Expiration:** API để expire orders và check expiration status
 
 ---
 
@@ -929,6 +997,284 @@ curl -X GET http://localhost:3000/orders \
 #### Lấy danh sách order items
 - **GET** `/orders/{orderId}/items`
 - **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+
+---
+
+## 7. Payment System
+
+### 7.1. Sepay Webhook Integration
+
+#### Endpoint
+- **POST** `/payments/webhook/sepay`
+
+#### Description
+Nhận webhook từ Sepay gateway khi có thanh toán thành công
+
+#### Request Body (Sepay Webhook)
+```json
+{
+  "gateway": "VPBank",
+  "transactionDate": "2025-07-14 16:41:00",
+  "accountNumber": "214244527",
+  "subAccount": null,
+  "code": "OCX4140716404",
+  "content": "NHAN TU 0697044105922 TRACE 714203 ND OCX414071640460109021012",
+  "transferType": "in",
+  "description": "BankAPINotify NHAN TU 0697044105922 TRACE 714203 ND OCX414071640460109021012",
+  "transferAmount": 10000,
+  "referenceCode": "FT25195113530033",
+  "accumulated": 0,
+  "id": 17673873
+}
+```
+
+#### Response (Success)
+```json
+{
+  "success": true,
+  "message": "Payment processed successfully",
+  "order_id": "order_cuid",
+  "payment_id": "payment_cuid"
+}
+```
+
+#### Response (No matching order)
+```json
+{
+  "success": true,
+  "message": "Payment received but no matching order found",
+  "payment_id": "payment_cuid"
+}
+```
+
+#### Logic xử lý:
+1. **Tìm order matching:** Sử dụng nhiều strategy để tránh nhầm lẫn:
+   - **Strategy 1:** Tìm theo order ID trong content (nếu có pattern OCXxxx)
+   - **Strategy 2:** Tìm theo amount + thời gian gần đây (24h)
+   - **Strategy 3:** Ưu tiên orders trong 30 phút gần nhất
+   - **Strategy 4:** Nếu nhiều orders cùng amount, chọn order gần nhất
+   - **Strategy 5:** Tìm theo email user trong content
+2. **Tạo payment record:** Lưu thông tin từ Sepay
+3. **Update order status:** Chuyển từ PENDING → PAID
+4. **Fallback:** Nếu không tìm thấy order, lưu payment để match thủ công
+
+---
+
+### 7.2. Get Payment Information
+
+#### Endpoint
+- **GET** `/payments/order/:orderId`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+
+#### Response
+```json
+{
+  "id": "payment_cuid",
+  "order_id": "order_cuid",
+  "amount": "1000000",
+  "currency": "VND",
+  "payment_method": "sepay",
+  "status": "SUCCESS",
+  "transaction_id": "FT25195113530033",
+  "gateway": "VPBank",
+  "transaction_date": "2025-07-14T16:41:00.000Z",
+  "account_number": "214244527",
+  "code": "OCX4140716404",
+  "content": "NHAN TU 0697044105922 TRACE 714203 ND OCX414071640460109021012",
+  "transfer_type": "in",
+  "description": "BankAPINotify NHAN TU 0697044105922 TRACE 714203 ND OCX414071640460109021012",
+  "reference_code": "FT25195113530033",
+  "accumulated": 0,
+  "sepay_id": 17673873,
+  "created_at": "2025-07-14T16:41:00.000Z",
+  "order": {
+    "id": "order_cuid",
+    "total_amount": "1000000",
+    "status": "PAID",
+    "created_at": "2025-07-14T16:30:00.000Z"
+  }
+}
+```
+
+---
+
+### 7.3. Manual Payment Matching
+
+#### Endpoint
+- **GET** `/payments/match/:orderId`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+
+#### Description
+Match thủ công payment với order (khi webhook không tự động match được)
+
+#### Response
+```json
+{
+  "success": true,
+  "message": "Payment matched successfully",
+  "payment": {
+    "id": "payment_cuid",
+    "order_id": "order_cuid",
+    "status": "SUCCESS"
+  },
+  "order_id": "order_cuid"
+}
+```
+
+---
+
+### 7.4. Payment Status
+
+| Status | Mô tả |
+|--------|-------|
+| **PENDING** | Payment đã nhận nhưng chưa match với order |
+| **SUCCESS** | Payment thành công và đã match với order |
+| **FAILED** | Payment thất bại |
+
+---
+
+### 7.5. Payment Matching Logic
+
+#### Tự động match (trong webhook):
+1. **Strategy 1:** Tìm theo order ID trong content (pattern OCXxxx)
+2. **Strategy 2:** Tìm theo amount + thời gian gần đây (24h)
+3. **Strategy 3:** Ưu tiên orders trong 30 phút gần nhất
+4. **Strategy 4:** Nếu nhiều orders cùng amount, chọn order gần nhất
+5. **Strategy 5:** Tìm theo email user trong content
+6. **Update order status:** Chuyển PENDING → PAID
+
+#### Manual match:
+1. **Tìm payment chưa match:** Payment có order_id = "" và status = PENDING
+2. **Kiểm tra amount:** Payment.amount = Order.total_amount
+3. **Update payment:** Gán order_id và chuyển status = SUCCESS
+4. **Update order:** Chuyển PENDING → PAID
+
+---
+
+### 7.6. Test Payment Webhook
+
+#### Test với cURL:
+```bash
+curl -X POST http://localhost:3000/payments/webhook/sepay \
+  -H "Content-Type: application/json" \
+  -d '{
+    "gateway": "VPBank",
+    "transactionDate": "2025-07-14 16:41:00",
+    "accountNumber": "214244527",
+    "subAccount": null,
+    "code": "OCX4140716404",
+    "content": "NHAN TU 0697044105922 TRACE 714203 ND OCX414071640460109021012",
+    "transferType": "in",
+    "description": "BankAPINotify NHAN TU 0697044105922 TRACE 714203 ND OCX414071640460109021012",
+    "transferAmount": 1000000,
+    "referenceCode": "FT25195113530033",
+    "accumulated": 0,
+    "id": 17673873
+  }'
+```
+
+#### Test get payment info:
+```bash
+curl -X GET http://localhost:3000/payments/order/order_cuid \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+```
+
+#### Test manual match:
+```bash
+curl -X GET http://localhost:3000/payments/match/order_cuid \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+```
+
+---
+
+### 7.7. Get Unmatched Payments
+
+#### Endpoint
+- **GET** `/payments/unmatched`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Query Parameters:**
+  - `limit` (optional): Số lượng records trả về (default: 50)
+  - `offset` (optional): Số lượng records bỏ qua (default: 0)
+
+#### Response
+```json
+{
+  "payments": [
+    {
+      "id": "payment_cuid",
+      "amount": "1000000",
+      "currency": "VND",
+      "payment_method": "sepay",
+      "status": "PENDING",
+      "gateway": "VPBank",
+      "transaction_date": "2025-07-14T16:41:00.000Z",
+      "content": "NHAN TU 0697044105922...",
+      "created_at": "2025-07-14T16:41:00.000Z"
+    }
+  ],
+  "pagination": {
+    "total": 5,
+    "limit": 50,
+    "offset": 0,
+    "hasMore": false
+  }
+}
+```
+
+---
+
+### 7.8. Get Pending Orders
+
+#### Endpoint
+- **GET** `/payments/pending-orders`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Query Parameters:**
+  - `limit` (optional): Số lượng records trả về (default: 50)
+  - `offset` (optional): Số lượng records bỏ qua (default: 0)
+
+#### Response
+```json
+{
+  "orders": [
+    {
+      "id": "order_cuid",
+      "total_amount": "1000000",
+      "status": "PENDING",
+      "created_at": "2025-07-14T16:30:00.000Z",
+      "user": {
+        "email": "user@example.com",
+        "phone": "0123456789",
+        "name": "John Doe"
+      },
+      "organization": {
+        "name": "Howls Studio"
+      },
+      "event": {
+        "title": "Sự kiện âm nhạc Howls",
+        "start_date": "2025-08-01T19:00:00.000Z"
+      },
+      "order_items": [
+        {
+          "quantity": 2,
+          "price": "500000",
+          "ticket": {
+            "name": "Vé VIP",
+            "price": "500000"
+          }
+        }
+      ]
+    }
+  ],
+  "pagination": {
+    "total": 10,
+    "limit": 50,
+    "offset": 0,
+    "hasMore": false
+  }
+}
+```
+
+---
 - **Response:**
 ```json
 [
@@ -1057,6 +1403,154 @@ curl -X GET http://localhost:3000/orders \
 ### 6.11. Lưu ý phân quyền
 - Tất cả các API CRUD order_items và payments đều yêu cầu JWT, phân quyền role như API orders.
 - USER chỉ thao tác với order của mình, ADMIN/OWNER/SUPERADMIN thao tác với tất cả.
+
+### 6.12. Order Expiration APIs
+
+#### Expire tất cả orders hết hạn
+- **POST** `/orders/expire-expired`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Response:**
+```json
+{
+  "message": "Processed 5 expired orders",
+  "expiredCount": 5
+}
+```
+
+#### Kiểm tra order có hết hạn không
+- **GET** `/orders/:id/check-expiration`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Response:**
+```json
+{
+  "isExpired": false,
+  "reservedUntil": "2025-07-16T19:43:43.490Z"
+}
+```
+
+---
+
+## 8. QR Code & Check-in API
+
+> **QR Code Generation và Check-in System** - Tự động generate QR codes và xử lý check-in
+
+---
+
+### 8.1. QR Code Generation
+
+#### Tự động generate khi tạo order
+- QR codes được tự động generate khi tạo order
+- Upload lên Supabase Storage với public URL
+- Lưu QR code URL vào `order_item.qr_code`
+
+#### QR Code Data Structure
+```json
+{
+  "orderId": "cmd6ctsyr0001jkhlwwr0dsis",
+  "orderItemId": "item_123",
+  "ticketId": "ticket_456",
+  "quantity": 2,
+  "timestamp": 1640995200000,
+  "hash": "cmd6ctsyr0001jkhlwwr0dsis_item_123_1640995200000_abc123"
+}
+```
+
+---
+
+### 8.2. Check-in với QR Code
+
+#### Verify QR và check-in
+- **POST** `/checkin/verify-qr`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Body:**
+```json
+{
+  "qrData": "{\"orderId\":\"cmd6ctsyr0001jkhlwwr0dsis\",\"orderItemId\":\"item_123\",\"ticketId\":\"ticket_456\",\"quantity\":2,\"timestamp\":1640995200000,\"hash\":\"abc123\"}",
+  "checkedBy": "admin@example.com"
+}
+```
+- **Response:**
+```json
+{
+  "success": true,
+  "message": "Check-in successful",
+  "data": {
+    "orderId": "cmd6ctsyr0001jkhlwwr0dsis",
+    "ticketName": "Vé VIP",
+    "eventName": "Sự kiện âm nhạc Howls",
+    "checkinTime": "2025-07-16T19:30:00.000Z",
+    "verifiedBy": "admin@example.com"
+  }
+}
+```
+
+#### Lấy check-in logs
+- **GET** `/checkin/logs?eventId=xxx&orderId=xxx`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Response:**
+```json
+[
+  {
+    "id": "checkin_id",
+    "user_id": "user_id",
+    "ticket_id": "ticket_id",
+    "event_id": "event_id",
+    "order_id": "order_id",
+    "order_item_id": "order_item_id",
+    "checkin_time": "2025-07-16T19:30:00.000Z",
+    "verified_by": "admin@example.com",
+    "notes": "QR Code verified: abc123",
+    "user": { "id": "user_id", "email": "user@example.com" },
+    "ticket": { "id": "ticket_id", "name": "Vé VIP" },
+    "event": { "id": "event_id", "title": "Sự kiện âm nhạc Howls" }
+  }
+]
+```
+
+#### Thống kê check-in theo event
+- **GET** `/checkin/stats/:eventId`
+- **Header:** `Authorization: Bearer <ACCESS_TOKEN>`
+- **Response:**
+```json
+{
+  "eventId": "event_id",
+  "totalTickets": 500,
+  "checkedInTickets": 350,
+  "remainingTickets": 150,
+  "checkinRate": "70.00%"
+}
+```
+
+---
+
+### 8.3. Check-in Validation Rules
+
+#### Kiểm tra hợp lệ:
+- ✅ **Order status:** Phải là PAID
+- ✅ **Duplicate prevention:** Không cho check-in 2 lần
+- ✅ **Event timing:** 2 giờ trước/sau event
+- ✅ **QR validation:** Timestamp không quá 24 giờ
+- ✅ **QR format:** Đúng cấu trúc JSON với required fields
+
+#### Error responses:
+```json
+{
+  "statusCode": 400,
+  "message": "Order must be paid before check-in"
+}
+```
+```json
+{
+  "statusCode": 400,
+  "message": "Ticket has already been checked in"
+}
+```
+```json
+{
+  "statusCode": 400,
+  "message": "Check-in period has expired"
+}
+```
 
 ---
 
@@ -1227,20 +1721,20 @@ curl -X POST http://localhost:3000/dashboard/organization/org_cuid/send-report \
 - User & Organization CRUD
 - Event & Ticket Management
 - Order Creation & Management
+- **QR Code Generation & Upload**
+- **Check-in System với QR verification**
+- **Order Expiration System (scheduled task)**
 - Dashboard & Analytics
 - PDF/CSV Export
 - Email Report Sending
 - Swagger UI Integration
 
 ### 🔄 **In Progress:**
-- Order Expiration System (scheduled task)
+- Payment Gateway Integration (Phase 5)
 
 ### ⏳ **Pending:**
-- Payment Gateway Integration
-- QR Code Generation
-- Check-in System
-- Webhook System
-- Unit Testing
+- Webhook System (Phase 9)
+- Unit Testing (Phase 10)
 
 ---
 
@@ -1276,4 +1770,4 @@ npm run start:dev
 
 ---
 
-**🎯 Next Steps:** Implement order expiration system to complete the core business logic. 
+**🎯 Next Steps:** Implement Payment Gateway Integration (Phase 5) và Webhook System (Phase 9) để hoàn thiện hệ thống. 
