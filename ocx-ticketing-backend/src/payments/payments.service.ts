@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { PaymentStatus, OrderStatus } from '@prisma/client';
+import { OrdersService } from '../orders/orders.service';
 
 interface SepayWebhookData {
   gateway: string;
@@ -19,7 +20,10 @@ interface SepayWebhookData {
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ordersService: OrdersService,
+  ) {}
 
   // Xử lý Sepay webhook
   async handleSepayWebhook(webhookData: SepayWebhookData) {
@@ -94,7 +98,7 @@ export class PaymentsService {
       });
 
       // Sinh mã code cho order_item_code khi order PAID
-      await (global as any).ordersService.generateOrderItemCodesForOrder?.(order.id);
+      await this.ordersService.generateOrderItemCodesForOrder(order.id);
 
       return {
         success: true,

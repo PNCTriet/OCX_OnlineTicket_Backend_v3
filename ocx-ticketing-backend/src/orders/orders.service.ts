@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
-import { OrderStatus, OrderItem } from '@prisma/client';
+import { OrderStatus, OrderItem, SendingStatus } from '@prisma/client';
 import { UserRole } from '../auth/roles.enum';
 import { PaymentStatus } from '@prisma/client';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -17,7 +17,9 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly qrService: QRService,
-  ) {}
+  ) {
+    console.log('OrdersService initialized');
+  }
 
   async createOrder(data: {
     user_id: string;
@@ -660,6 +662,94 @@ export class OrdersService {
     } catch (error) {
       console.error('Error in scheduled task for expired orders:', error);
     }
+  }
+
+  async updateSendingStatus(orderId: string, sending_status: SendingStatus, userLocal: any) {
+    // Lấy order
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Order not found');
+    // Chỉ user sở hữu hoặc admin/organizer/superadmin mới được update
+    if (
+      userLocal.role !== UserRole.ADMIN_ORGANIZER &&
+      userLocal.role !== UserRole.OWNER_ORGANIZER &&
+      userLocal.role !== UserRole.SUPERADMIN &&
+      order.user_id !== userLocal.id
+    ) {
+      throw new BadRequestException('You do not have permission to update this order');
+    }
+    // Cập nhật trạng thái gửi mail
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { sending_status },
+    });
+    return { message: 'Order sending_status updated', order: updated };
+  }
+
+  // Lấy order items theo event_id
+  async getOrderItemsByEvent(eventId: string) {
+    // Kiểm tra event tồn tại
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) {
+      throw new NotFoundException(`Event ${eventId} not found`);
+    }
+
+    // Lấy tất cả order items của event này
+    const orderItems = await this.prisma.orderItem.findMany({
+      where: {
+        order: {
+          event_id: eventId,
+        },
+      },
+      include: {
+        order: {
+          select: {
+            id: true,
+            status: true,
+            created_at: true,
+            user: {
+              select: {
+                id: true,
+                email: true,
+                first_name: true,
+                last_name: true,
+              },
+            },
+          },
+        },
+        ticket: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            description: true,
+          },
+        },
+        codes: {
+          select: {
+            id: true,
+            code: true,
+            used: true,
+            used_at: true,
+            created_at: true,
+          },
+        },
+      },
+      orderBy: {
+        order: {
+          created_at: 'desc',
+        },
+      },
+    });
+
+    return {
+      event_id: eventId,
+      event_name: event.title,
+      total_items: orderItems.length,
+      items: orderItems,
+    };
   }
 }
 

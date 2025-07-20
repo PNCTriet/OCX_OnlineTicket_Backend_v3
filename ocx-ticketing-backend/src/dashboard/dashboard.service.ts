@@ -111,6 +111,105 @@ export class DashboardService {
     }));
   }
 
+  async getSystemStatsByTime(from: string, to: string, groupBy: 'day' | 'week' | 'month') {
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    
+    // Lấy orders trong khoảng thời gian
+    const orders = await this.prisma.order.findMany({
+      where: {
+        created_at: { gte: fromDate, lte: toDate },
+      },
+      select: {
+        total_amount: true,
+        created_at: true,
+      },
+    });
+    
+    // Lấy tickets sold trong khoảng thời gian
+    const tickets = await this.prisma.ticket.findMany({
+      where: {
+        updated_at: { gte: fromDate, lte: toDate },
+      },
+      select: {
+        sold_qty: true,
+        updated_at: true,
+      },
+    });
+    
+    // Lấy events created trong khoảng thời gian
+    const events = await this.prisma.event.findMany({
+      where: {
+        created_at: { gte: fromDate, lte: toDate },
+      },
+      select: {
+        created_at: true,
+      },
+    });
+    
+    // Lấy organizations created trong khoảng thời gian
+    const organizations = await this.prisma.organization.findMany({
+      where: {
+        created_at: { gte: fromDate, lte: toDate },
+      },
+      select: {
+        created_at: true,
+      },
+    });
+    
+    // Group by logic
+    function getKey(date: Date) {
+      if (groupBy === 'day') return date.toISOString().slice(0, 10);
+      if (groupBy === 'month') return date.getFullYear() + '-' + (date.getMonth() + 1).toString().padStart(2, '0');
+      // week: ISO week string
+      const d = new Date(date);
+      d.setHours(0,0,0,0);
+      d.setDate(d.getDate() - d.getDay() + 1); // Monday as first day
+      return d.toISOString().slice(0, 10);
+    }
+    
+    const revenueByTime: Record<string, number> = {};
+    const ticketsByTime: Record<string, number> = {};
+    const eventsByTime: Record<string, number> = {};
+    const organizationsByTime: Record<string, number> = {};
+    
+    orders.forEach(o => {
+      const key = getKey(o.created_at);
+      revenueByTime[key] = (revenueByTime[key] || 0) + Number(o.total_amount);
+    });
+    
+    tickets.forEach(t => {
+      const key = getKey(t.updated_at);
+      ticketsByTime[key] = (ticketsByTime[key] || 0) + Number(t.sold_qty);
+    });
+    
+    events.forEach(e => {
+      const key = getKey(e.created_at);
+      eventsByTime[key] = (eventsByTime[key] || 0) + 1;
+    });
+    
+    organizations.forEach(o => {
+      const key = getKey(o.created_at);
+      organizationsByTime[key] = (organizationsByTime[key] || 0) + 1;
+    });
+    
+    // Merge keys
+    const allKeys = Array.from(new Set([
+      ...Object.keys(revenueByTime), 
+      ...Object.keys(ticketsByTime),
+      ...Object.keys(eventsByTime),
+      ...Object.keys(organizationsByTime)
+    ])).sort();
+    
+    return allKeys.map(key => ({
+      time: key,
+      revenue: revenueByTime[key] || 0,
+      tickets_sold: ticketsByTime[key] || 0,
+      events_created: eventsByTime[key] || 0,
+      organizations_created: organizationsByTime[key] || 0,
+    }));
+  }
+
   async getEventStatsByTime(event_id: string, from: string, to: string, groupBy: 'day' | 'week' | 'month') {
     const fromDate = new Date(from);
     const toDate = new Date(to);

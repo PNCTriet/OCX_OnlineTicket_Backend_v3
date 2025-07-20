@@ -6,6 +6,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { Request } from 'express';
 import { ApiBody, ApiTags, ApiBearerAuth, ApiResponse, ApiOperation } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
+import { SendingStatus } from '@prisma/client';
 
 interface AuthenticatedRequest extends Request {
   user: any;
@@ -127,6 +128,16 @@ export class OrdersController {
   @Get(':orderId/items')
   async getOrderItems(@Param('orderId') orderId: string) {
     return this.ordersService.getOrderItems(orderId);
+  }
+
+  // Lấy order items theo event_id
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @Get('event/:eventId/items')
+  @ApiOperation({ summary: 'Get order items by event ID' })
+  @ApiResponse({ status: 200, description: 'Order items retrieved successfully' })
+  async getOrderItemsByEvent(@Param('eventId') eventId: string) {
+    return this.ordersService.getOrderItemsByEvent(eventId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -295,5 +306,29 @@ export class OrdersController {
     @Param('paymentId') paymentId: string,
   ) {
     return this.ordersService.deletePayment(orderId, paymentId);
+  }
+
+  @UseGuards(JwtAuthGuard, RoleGuard)
+  @Roles(UserRole.USER, UserRole.ADMIN_ORGANIZER, UserRole.OWNER_ORGANIZER, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
+  @Patch(':id/sending-status')
+  @ApiOperation({ summary: 'Update sending_status of order (user or admin)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        sending_status: { type: 'string', enum: ['NOT_SENT', 'SENDING', 'SENT', 'FAILED'], example: 'SENT' },
+      },
+      required: ['sending_status'],
+      example: { sending_status: 'SENT' },
+    },
+    description: 'Cập nhật trạng thái gửi mail ticket cho order.'
+  })
+  async updateSendingStatus(
+    @Param('id') id: string,
+    @Body() body: { sending_status: SendingStatus },
+    @CurrentUser() userLocal: any
+  ) {
+    return this.ordersService.updateSendingStatus(id, body.sending_status, userLocal);
   }
 }

@@ -42,6 +42,14 @@ enum OrderStatus {
   EXPIRED
 }
 
+// Thêm enum trạng thái gửi mail ticket
+enum SendingStatus {
+  NOT_SENT
+  SENDING
+  SENT
+  FAILED
+}
+
 // Payment Status Enum
 enum PaymentStatus {
   PENDING
@@ -171,7 +179,8 @@ model Order {
   paid_at        DateTime?   // Thời điểm thanh toán thành công
   created_at     DateTime    @default(now())
   updated_at     DateTime    @updatedAt
-
+  // Thêm trường trạng thái gửi mail ticket
+  sending_status SendingStatus @default(NOT_SENT)
   // Relationships
   user         User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
   organization Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)

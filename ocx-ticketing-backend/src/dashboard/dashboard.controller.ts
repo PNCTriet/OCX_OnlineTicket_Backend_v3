@@ -24,6 +24,13 @@ export class DashboardController {
     return this.dashboardService.getSystemStats();
   }
 
+  @Get('system/time')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  getSystemStatsByTime(@Query('from') from: string, @Query('to') to: string, @Query('groupBy') groupBy: 'day' | 'week' | 'month' = 'day') {
+    return this.dashboardService.getSystemStatsByTime(from, to, groupBy);
+  }
+
   @Get('organization/:id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
