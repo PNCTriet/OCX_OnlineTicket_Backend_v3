@@ -18,19 +18,38 @@ Tất cả API đều yêu cầu xác thực JWT.
 
 ### `GET /dashboard/system`
 - **Trả về:**
-  - Tổng doanh thu (tất cả order)
-  - Tổng số vé đã bán
-  - Tổng số đơn hàng
+  - Tổng doanh thu (chỉ tính các order đã PAID)
+  - Tổng số vé đã bán (chỉ tính từ order đã PAID)
+  - Tổng số đơn hàng (phân loại theo status: PAID, PENDING, CANCELLED, EXPIRED, ...)
   - Tổng số sự kiện
   - Tổng số tổ chức
 - **Logic:**
-  - Dùng Prisma aggregate và count trên các bảng `order`, `ticket`, `event`, `organization`.
+  - Doanh thu: Prisma aggregate SUM trên bảng `order` với điều kiện `status = 'PAID'`
+  - Vé đã bán: SUM quantity của order_items thuộc order `status = 'PAID'`
+  - Đơn hàng: Prisma count trên bảng `order`, group by `status`
+  - Sự kiện, tổ chức: count như cũ
+- **Response mẫu:**
+  ```json
+  {
+    "total_revenue": 100000000,
+    "total_tickets_sold": 5000,
+    "total_orders": {
+      "PAID": 3000,
+      "PENDING": 200,
+      "CANCELLED": 100,
+      "EXPIRED": 50
+    },
+    "total_events": 120,
+    "total_organizations": 20
+  }
+  ```
 
 ### `GET /dashboard/system/time?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=day|week|month`
 - **Trả về:**
   - Thống kê doanh thu, vé bán, số sự kiện, số tổ chức mới theo từng mốc thời gian (ngày/tuần/tháng)
 - **Logic:**
   - Lọc order, ticket, event, organization theo khoảng thời gian.
+  - Doanh thu, vé bán chỉ tính các order `status = 'PAID'`
   - Gom nhóm (group by) theo ngày/tuần/tháng dựa trên trường `created_at`/`updated_at`.
   - Trả về mảng các object `{ time, revenue, tickets_sold, events_created, organizations_created }`
 
@@ -40,15 +59,16 @@ Tất cả API đều yêu cầu xác thực JWT.
 
 ### `GET /dashboard/organization/:id`
 - **Trả về:**
-  - Tổng doanh thu, tổng vé bán, tổng đơn hàng, tổng sự kiện của tổ chức
+  - Tổng doanh thu, tổng vé bán (chỉ tính order đã PAID), tổng đơn hàng (phân loại theo status), tổng sự kiện của tổ chức
 - **Logic:**
-  - Aggregate/count với điều kiện `organization_id`.
+  - Aggregate/count với điều kiện `organization_id` và `status = 'PAID'` cho doanh thu, vé bán
+  - Đơn hàng: count group by status
 
 ### `GET /dashboard/organization/:id/time?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=day|week|month`
 - **Trả về:**
-  - Thống kê doanh thu, vé bán theo từng mốc thời gian cho tổ chức
+  - Thống kê doanh thu, vé bán theo từng mốc thời gian cho tổ chức (chỉ tính order đã PAID)
 - **Logic:**
-  - Lọc order, ticket theo `organization_id` và khoảng thời gian.
+  - Lọc order, ticket theo `organization_id`, `status = 'PAID'` và khoảng thời gian.
   - Gom nhóm theo ngày/tuần/tháng.
 
 ### `GET /dashboard/organization/:id/export/pdf|csv`
@@ -70,15 +90,16 @@ Tất cả API đều yêu cầu xác thực JWT.
 
 ### `GET /dashboard/event/:id`
 - **Trả về:**
-  - Tổng doanh thu, tổng vé bán, tổng đơn hàng, tổng lượt check-in của sự kiện
+  - Tổng doanh thu, tổng vé bán (chỉ tính order đã PAID), tổng đơn hàng (phân loại theo status), tổng lượt check-in của sự kiện
 - **Logic:**
-  - Aggregate/count với điều kiện `event_id`.
+  - Aggregate/count với điều kiện `event_id` và `status = 'PAID'` cho doanh thu, vé bán
+  - Đơn hàng: count group by status
 
 ### `GET /dashboard/event/:id/time?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=day|week|month`
 - **Trả về:**
-  - Thống kê doanh thu, vé bán theo từng mốc thời gian cho sự kiện
+  - Thống kê doanh thu, vé bán theo từng mốc thời gian cho sự kiện (chỉ tính order đã PAID)
 - **Logic:**
-  - Lọc order, ticket theo `event_id` và khoảng thời gian.
+  - Lọc order, ticket theo `event_id`, `status = 'PAID'` và khoảng thời gian.
   - Gom nhóm theo ngày/tuần/tháng.
 
 ---

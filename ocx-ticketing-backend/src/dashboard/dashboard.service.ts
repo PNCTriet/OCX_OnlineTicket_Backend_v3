@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma.service';
 import PDFDocument = require('pdfkit');
 import { Response } from 'express';
 import nodemailer from 'nodemailer';
+import { OrderStatus } from '@prisma/client';
 
 @Injectable()
 export class DashboardService {
@@ -11,16 +12,25 @@ export class DashboardService {
   // Thêm các hàm thống kê ở đây
 
   async getSystemStats() {
-    const [totalRevenue, totalTickets, totalOrders, totalEvents, totalOrganizations] = await Promise.all([
-      this.prisma.order.aggregate({ _sum: { total_amount: true } }),
-      this.prisma.ticket.aggregate({ _sum: { sold_qty: true } }),
-      this.prisma.order.count(),
+    // Tổng doanh thu và vé bán chỉ tính order PAID
+    const [totalRevenue, totalTickets, totalEvents, totalOrganizations, orderStatusCounts] = await Promise.all([
+      this.prisma.order.aggregate({ where: { status: 'PAID' }, _sum: { total_amount: true } }),
+      this.prisma.orderItem.aggregate({ where: { order: { status: 'PAID' } }, _sum: { quantity: true } }),
       this.prisma.event.count(),
       this.prisma.organization.count(),
+      this.prisma.order.groupBy({
+        by: ['status'],
+        _count: { status: true },
+      }),
     ]);
+    // Chuyển groupBy thành object
+    const totalOrders: Record<string, number> = {};
+    orderStatusCounts.forEach(row => {
+      totalOrders[row.status] = row._count.status;
+    });
     return {
       total_revenue: totalRevenue._sum.total_amount || 0,
-      total_tickets_sold: totalTickets._sum.sold_qty || 0,
+      total_tickets_sold: totalTickets._sum.quantity || 0,
       total_orders: totalOrders,
       total_events: totalEvents,
       total_organizations: totalOrganizations,
@@ -28,58 +38,166 @@ export class DashboardService {
   }
 
   async getOrganizationStats(organization_id: string) {
-    const [totalRevenue, totalTickets, totalOrders, totalEvents] = await Promise.all([
-      this.prisma.order.aggregate({ where: { organization_id }, _sum: { total_amount: true } }),
-      this.prisma.ticket.aggregate({ where: { event: { organization_id } }, _sum: { sold_qty: true } }),
-      this.prisma.order.count({ where: { organization_id } }),
+    const [totalRevenue, totalTickets, totalEvents, orderStatusCounts] = await Promise.all([
+      this.prisma.order.aggregate({ where: { organization_id, status: 'PAID' }, _sum: { total_amount: true } }),
+      this.prisma.orderItem.aggregate({ where: { order: { organization_id, status: 'PAID' } }, _sum: { quantity: true } }),
       this.prisma.event.count({ where: { organization_id } }),
+      this.prisma.order.groupBy({
+        by: ['status'],
+        where: { organization_id },
+        _count: { status: true },
+      }),
     ]);
+    const totalOrders: Record<string, number> = {};
+    orderStatusCounts.forEach(row => {
+      totalOrders[row.status] = row._count.status;
+    });
     return {
       total_revenue: totalRevenue._sum.total_amount || 0,
-      total_tickets_sold: totalTickets._sum.sold_qty || 0,
+      total_tickets_sold: totalTickets._sum.quantity || 0,
       total_orders: totalOrders,
       total_events: totalEvents,
     };
   }
 
   async getEventStats(event_id: string) {
-    const [totalRevenue, totalTickets, totalOrders, totalCheckins] = await Promise.all([
-      this.prisma.order.aggregate({ where: { event_id }, _sum: { total_amount: true } }),
-      this.prisma.ticket.aggregate({ where: { event_id }, _sum: { sold_qty: true } }),
-      this.prisma.order.count({ where: { event_id } }),
+    const [totalRevenue, totalTickets, totalCheckins, orderStatusCounts] = await Promise.all([
+      this.prisma.order.aggregate({ where: { event_id, status: 'PAID' }, _sum: { total_amount: true } }),
+      this.prisma.orderItem.aggregate({ where: { order: { event_id, status: 'PAID' } }, _sum: { quantity: true } }),
       this.prisma.checkinLog.count({ where: { order: { event_id } } }),
+      this.prisma.order.groupBy({
+        by: ['status'],
+        where: { event_id },
+        _count: { status: true },
+      }),
     ]);
+    const totalOrders: Record<string, number> = {};
+    orderStatusCounts.forEach(row => {
+      totalOrders[row.status] = row._count.status;
+    });
     return {
       total_revenue: totalRevenue._sum.total_amount || 0,
-      total_tickets_sold: totalTickets._sum.sold_qty || 0,
+      total_tickets_sold: totalTickets._sum.quantity || 0,
       total_orders: totalOrders,
       total_checkins: totalCheckins,
     };
   }
 
-  async getOrganizationStatsByTime(organization_id: string, from: string, to: string, groupBy: 'day' | 'week' | 'month') {
+  async getSystemStatsByTime(from: string, to: string, groupBy: 'day' | 'week' | 'month') {
     const fromDate = new Date(from);
     const toDate = new Date(to);
-    // Lấy orders trong khoảng thời gian
+    // Lấy orders PAID trong khoảng thời gian
     const orders = await this.prisma.order.findMany({
       where: {
-        organization_id,
+        status: 'PAID',
         created_at: { gte: fromDate, lte: toDate },
       },
       select: {
         total_amount: true,
         created_at: true,
+        id: true,
       },
     });
-    // Lấy tickets sold trong khoảng thời gian
-    const tickets = await this.prisma.ticket.findMany({
+    // Lấy order_items của các order PAID
+    const orderIds = orders.map(o => o.id);
+    const orderItems = await this.prisma.orderItem.findMany({
       where: {
-        event: { organization_id },
-        updated_at: { gte: fromDate, lte: toDate },
+        order_id: { in: orderIds },
       },
       select: {
-        sold_qty: true,
-        updated_at: true,
+        quantity: true,
+        order: { select: { created_at: true } },
+      },
+    });
+    // Lấy events created trong khoảng thời gian
+    const events = await this.prisma.event.findMany({
+      where: {
+        created_at: { gte: fromDate, lte: toDate },
+      },
+      select: {
+        created_at: true,
+      },
+    });
+    // Lấy organizations created trong khoảng thời gian
+    const organizations = await this.prisma.organization.findMany({
+      where: {
+        created_at: { gte: fromDate, lte: toDate },
+      },
+      select: {
+        created_at: true,
+      },
+    });
+    // Group by logic
+    function getKey(date: Date) {
+      if (groupBy === 'day') return date.toISOString().slice(0, 10);
+      if (groupBy === 'month') return date.getFullYear() + '-' + (date.getMonth() + 1).toString().padStart(2, '0');
+      // week: ISO week string
+      const d = new Date(date);
+      d.setHours(0,0,0,0);
+      d.setDate(d.getDate() - d.getDay() + 1); // Monday as first day
+      return d.toISOString().slice(0, 10);
+    }
+    const revenueByTime: Record<string, number> = {};
+    const ticketsByTime: Record<string, number> = {};
+    const eventsByTime: Record<string, number> = {};
+    const organizationsByTime: Record<string, number> = {};
+    orders.forEach(o => {
+      const key = getKey(o.created_at);
+      revenueByTime[key] = (revenueByTime[key] || 0) + Number(o.total_amount);
+    });
+    orderItems.forEach(item => {
+      const key = getKey(item.order.created_at);
+      ticketsByTime[key] = (ticketsByTime[key] || 0) + Number(item.quantity);
+    });
+    events.forEach(e => {
+      const key = getKey(e.created_at);
+      eventsByTime[key] = (eventsByTime[key] || 0) + 1;
+    });
+    organizations.forEach(o => {
+      const key = getKey(o.created_at);
+      organizationsByTime[key] = (organizationsByTime[key] || 0) + 1;
+    });
+    // Merge keys
+    const allKeys = Array.from(new Set([
+      ...Object.keys(revenueByTime), 
+      ...Object.keys(ticketsByTime),
+      ...Object.keys(eventsByTime),
+      ...Object.keys(organizationsByTime)
+    ])).sort();
+    return allKeys.map(key => ({
+      time: key,
+      revenue: revenueByTime[key] || 0,
+      tickets_sold: ticketsByTime[key] || 0,
+      events_created: eventsByTime[key] || 0,
+      organizations_created: organizationsByTime[key] || 0,
+    }));
+  }
+
+  async getOrganizationStatsByTime(organization_id: string, from: string, to: string, groupBy: 'day' | 'week' | 'month') {
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    // Lấy orders PAID trong khoảng thời gian
+    const orders = await this.prisma.order.findMany({
+      where: {
+        organization_id,
+        status: 'PAID',
+        created_at: { gte: fromDate, lte: toDate },
+      },
+      select: {
+        total_amount: true,
+        created_at: true,
+        id: true,
+      },
+    });
+    // Lấy order_items của các order PAID
+    const orderIds = orders.map(o => o.id);
+    const orderItems = await this.prisma.orderItem.findMany({
+      where: {
+        order_id: { in: orderIds },
+      },
+      select: {
+        quantity: true,
+        order: { select: { created_at: true } },
       },
     });
     // Group by logic
@@ -98,9 +216,9 @@ export class DashboardService {
       const key = getKey(o.created_at);
       revenueByTime[key] = (revenueByTime[key] || 0) + Number(o.total_amount);
     });
-    tickets.forEach(t => {
-      const key = getKey(t.updated_at);
-      ticketsByTime[key] = (ticketsByTime[key] || 0) + Number(t.sold_qty);
+    orderItems.forEach(item => {
+      const key = getKey(item.order.created_at);
+      ticketsByTime[key] = (ticketsByTime[key] || 0) + Number(item.quantity);
     });
     // Merge keys
     const allKeys = Array.from(new Set([...Object.keys(revenueByTime), ...Object.keys(ticketsByTime)])).sort();
@@ -111,128 +229,31 @@ export class DashboardService {
     }));
   }
 
-  async getSystemStatsByTime(from: string, to: string, groupBy: 'day' | 'week' | 'month') {
-    const fromDate = new Date(from);
-    const toDate = new Date(to);
-    
-    // Lấy orders trong khoảng thời gian
-    const orders = await this.prisma.order.findMany({
-      where: {
-        created_at: { gte: fromDate, lte: toDate },
-      },
-      select: {
-        total_amount: true,
-        created_at: true,
-      },
-    });
-    
-    // Lấy tickets sold trong khoảng thời gian
-    const tickets = await this.prisma.ticket.findMany({
-      where: {
-        updated_at: { gte: fromDate, lte: toDate },
-      },
-      select: {
-        sold_qty: true,
-        updated_at: true,
-      },
-    });
-    
-    // Lấy events created trong khoảng thời gian
-    const events = await this.prisma.event.findMany({
-      where: {
-        created_at: { gte: fromDate, lte: toDate },
-      },
-      select: {
-        created_at: true,
-      },
-    });
-    
-    // Lấy organizations created trong khoảng thời gian
-    const organizations = await this.prisma.organization.findMany({
-      where: {
-        created_at: { gte: fromDate, lte: toDate },
-      },
-      select: {
-        created_at: true,
-      },
-    });
-    
-    // Group by logic
-    function getKey(date: Date) {
-      if (groupBy === 'day') return date.toISOString().slice(0, 10);
-      if (groupBy === 'month') return date.getFullYear() + '-' + (date.getMonth() + 1).toString().padStart(2, '0');
-      // week: ISO week string
-      const d = new Date(date);
-      d.setHours(0,0,0,0);
-      d.setDate(d.getDate() - d.getDay() + 1); // Monday as first day
-      return d.toISOString().slice(0, 10);
-    }
-    
-    const revenueByTime: Record<string, number> = {};
-    const ticketsByTime: Record<string, number> = {};
-    const eventsByTime: Record<string, number> = {};
-    const organizationsByTime: Record<string, number> = {};
-    
-    orders.forEach(o => {
-      const key = getKey(o.created_at);
-      revenueByTime[key] = (revenueByTime[key] || 0) + Number(o.total_amount);
-    });
-    
-    tickets.forEach(t => {
-      const key = getKey(t.updated_at);
-      ticketsByTime[key] = (ticketsByTime[key] || 0) + Number(t.sold_qty);
-    });
-    
-    events.forEach(e => {
-      const key = getKey(e.created_at);
-      eventsByTime[key] = (eventsByTime[key] || 0) + 1;
-    });
-    
-    organizations.forEach(o => {
-      const key = getKey(o.created_at);
-      organizationsByTime[key] = (organizationsByTime[key] || 0) + 1;
-    });
-    
-    // Merge keys
-    const allKeys = Array.from(new Set([
-      ...Object.keys(revenueByTime), 
-      ...Object.keys(ticketsByTime),
-      ...Object.keys(eventsByTime),
-      ...Object.keys(organizationsByTime)
-    ])).sort();
-    
-    return allKeys.map(key => ({
-      time: key,
-      revenue: revenueByTime[key] || 0,
-      tickets_sold: ticketsByTime[key] || 0,
-      events_created: eventsByTime[key] || 0,
-      organizations_created: organizationsByTime[key] || 0,
-    }));
-  }
-
   async getEventStatsByTime(event_id: string, from: string, to: string, groupBy: 'day' | 'week' | 'month') {
     const fromDate = new Date(from);
     const toDate = new Date(to);
-    // Lấy orders trong khoảng thời gian
+    // Lấy orders PAID trong khoảng thời gian
     const orders = await this.prisma.order.findMany({
       where: {
         event_id,
+        status: 'PAID',
         created_at: { gte: fromDate, lte: toDate },
       },
       select: {
         total_amount: true,
         created_at: true,
+        id: true,
       },
     });
-    // Lấy tickets sold trong khoảng thời gian
-    const tickets = await this.prisma.ticket.findMany({
+    // Lấy order_items của các order PAID
+    const orderIds = orders.map(o => o.id);
+    const orderItems = await this.prisma.orderItem.findMany({
       where: {
-        event_id,
-        updated_at: { gte: fromDate, lte: toDate },
+        order_id: { in: orderIds },
       },
       select: {
-        sold_qty: true,
-        updated_at: true,
+        quantity: true,
+        order: { select: { created_at: true } },
       },
     });
     // Group by logic
@@ -251,9 +272,9 @@ export class DashboardService {
       const key = getKey(o.created_at);
       revenueByTime[key] = (revenueByTime[key] || 0) + Number(o.total_amount);
     });
-    tickets.forEach(t => {
-      const key = getKey(t.updated_at);
-      ticketsByTime[key] = (ticketsByTime[key] || 0) + Number(t.sold_qty);
+    orderItems.forEach(item => {
+      const key = getKey(item.order.created_at);
+      ticketsByTime[key] = (ticketsByTime[key] || 0) + Number(item.quantity);
     });
     // Merge keys
     const allKeys = Array.from(new Set([...Object.keys(revenueByTime), ...Object.keys(ticketsByTime)])).sort();
