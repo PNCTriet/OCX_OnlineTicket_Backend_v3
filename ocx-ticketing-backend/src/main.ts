@@ -6,12 +6,12 @@ import * as basicAuth from 'express-basic-auth';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Bảo vệ /api bằng basic auth
+  
   app.use(
     ['/api'],
     basicAuth({
       challenge: true,
-      users: { 'admin': '250520' }, // đổi user/pass theo ý bạn
+      users: { 'admin': '250520' }, 
     }),
   );
 
@@ -26,10 +26,10 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  // Bật CORS cho mọi domain (phát triển local)
+  
   app.enableCors({
-    origin: true, // hoặc ['http://localhost:3001']
-    credentials: true, // nếu cần gửi cookie
+    origin: true, 
+    credentials: true, 
   });
 
   await app.listen(3000);
