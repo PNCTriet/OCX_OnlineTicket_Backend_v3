@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma.service';
 import { PaymentStatus, OrderStatus } from '@prisma/client';
 import { OrdersService } from '../orders/orders.service';
+import axios from 'axios';
 
 interface SepayWebhookData {
   gateway: string;
@@ -99,6 +100,31 @@ export class PaymentsService {
 
       // Sinh mã code cho order_item_code khi order PAID
       await this.ordersService.generateOrderItemCodesForOrder(order.id);
+
+      // Sau khi cập nhật trạng thái đơn hàng thành công (ví dụ sau khi set order.status = SUCCESS)
+      // Lấy email user cho order
+      let userEmail = '';
+      if (order && typeof order === 'object' && 'user' in order && order.user && typeof order.user === 'object' && 'email' in order.user && typeof order.user.email === 'string') {
+        userEmail = order.user.email;
+      } else if (order.user_id) {
+        const user = await this.prisma.user.findUnique({ where: { id: order.user_id } });
+        if (user && typeof user.email === 'string') {
+          userEmail = user.email;
+        }
+      }
+      try {
+        await axios.post('https://otcayxe.com/api/payment-webhook', {
+          orderId: order.id,
+          status: order.status,
+          amount: order.total_amount,
+          userEmail,
+          paidAt: new Date().toISOString(),
+          // Thêm các trường cần thiết khác
+        });
+      } catch (err) {
+        console.error('Failed to send payment webhook to frontend:', err.message);
+        // Có thể lưu log để retry sau nếu cần
+      }
 
       return {
         success: true,
