@@ -3,6 +3,7 @@
     "@nestjs/jwt": "^11.0.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/swagger": "^11.2.0",
+    "@types/qrcode": "^1.5.5",
     "axios": "^1.11.0",
     "jsonwebtoken": "^9.0.2",
     "passport": "^0.7.0",
