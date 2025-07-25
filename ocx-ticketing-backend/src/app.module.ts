@@ -10,22 +10,22 @@ import { TicketsModule } from './tickets/tickets.module';
 import { OrdersModule } from './orders/orders.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PaymentsModule } from './payments/payments.module';
+import { EmailModule } from './email/email.module';
 import { ScheduleModule } from '@nestjs/schedule';
-
 
 @Module({
   imports: [
-    
-    PassportModule.register({ defaultStrategy: 'jwt' }),
-    AuthModule, 
-    UsersModule, 
-    OrganizationsModule, 
-    EventsModule, 
-    TicketsModule, 
-    OrdersModule, 
+    PassportModule,
+    AuthModule,
+    UsersModule,
+    OrganizationsModule,
+    EventsModule,
+    TicketsModule,
+    OrdersModule,
     DashboardModule,
+    PaymentsModule,
+    EmailModule,
     ScheduleModule.forRoot(),
-    PaymentsModule
   ],
   controllers: [AppController],
   providers: [AppService],

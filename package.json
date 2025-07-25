@@ -7,6 +7,9 @@
     "jsonwebtoken": "^9.0.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "puppeteer": "^24.15.0",
+    "qrcode": "^1.5.4",
+    "resend": "^4.7.0",
     "swagger-ui-express": "^5.0.1"
   }
 }
