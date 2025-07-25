@@ -105,7 +105,7 @@ export class OrdersService {
     };
   }
 
-  async getOrder(id: string) {
+  async getOrder(id: string, userLocal: any) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
@@ -124,6 +124,14 @@ export class OrdersService {
 
     if (!order) {
       throw new NotFoundException(`Order ${id} not found`);
+    }
+
+    // Phân quyền: user thường chỉ được xem order của mình
+    if (
+      userLocal.role === 'USER' &&
+      order.user_id !== userLocal.id
+    ) {
+      throw new BadRequestException('Access denied. You can only view your own orders.');
     }
 
     return order;

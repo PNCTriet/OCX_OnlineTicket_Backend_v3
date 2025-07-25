@@ -111,7 +111,7 @@ export class PaymentsService {
         }
         await axios.post('https://otcayxe.com/api/payment-webhook', {
           orderId: order.id,
-          status: 'SUCCESS',
+          status: 'PAID',
           amount: webhookData.transferAmount,
           userEmail,
           paidAt: new Date().toISOString(),

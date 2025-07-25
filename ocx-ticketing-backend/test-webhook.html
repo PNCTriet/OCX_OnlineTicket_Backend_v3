@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Payment Webhook</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    button { padding: 10px 20px; font-size: 16px; }
+    #result { margin-top: 20px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>Test gửi Payment Webhook tới Frontend</h2>
+  <button id="sendBtn">Gửi webhook</button>
+  <div id="result"></div>
+  <script>
+    document.getElementById('sendBtn').onclick = async function() {
+      const payload = {
+        orderId: 'test123',
+        status: 'PAID',
+        amount: 100000,
+        userEmail: 'testuser@example.com',
+        paidAt: new Date().toISOString()
+      };
+      document.getElementById('result').innerText = 'Đang gửi...';
+      try {
+        const res = await fetch('https://otcayxe.com/api/payment-webhook', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          document.getElementById('result').innerText = 'Gửi thành công! Frontend đã nhận webhook.';
+        } else {
+          document.getElementById('result').innerText = 'Gửi thất bại! Status: ' + res.status;
+        }
+      } catch (err) {
+        document.getElementById('result').innerText = 'Lỗi: ' + err;
+      }
+    }
+  </script>
+</body>
+</html> 

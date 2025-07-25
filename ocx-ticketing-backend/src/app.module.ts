@@ -15,6 +15,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
+    
     PassportModule.register({ defaultStrategy: 'jwt' }),
     AuthModule, 
     UsersModule, 

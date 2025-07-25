@@ -71,15 +71,14 @@ export class OrdersController {
     });
   }
 
-  @UseGuards(JwtAuthGuard, RoleGuard)
-  @Roles(UserRole.ADMIN_ORGANIZER, UserRole.OWNER_ORGANIZER, UserRole.SUPERADMIN)
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @Get(':id')
-  @ApiOperation({ summary: 'Get order by ID (Admin/Organizer only)' })
+  @ApiOperation({ summary: 'Get order by ID (User hoặc Admin/Organizer)' })
   @ApiResponse({ status: 200, description: 'Order retrieved successfully' })
-  @ApiResponse({ status: 403, description: 'Access denied. Admin/Organizer role required.' })
-  async getOrder(@Param('id') id: string) {
-    return this.ordersService.getOrder(id);
+  @ApiResponse({ status: 403, description: 'Access denied.' })
+  async getOrder(@Param('id') id: string, @CurrentUser() userLocal: any) {
+    return this.ordersService.getOrder(id, userLocal);
   }
 
   @UseGuards(JwtAuthGuard, RoleGuard)
