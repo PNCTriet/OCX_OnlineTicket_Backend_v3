@@ -1,7 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { Resend } from 'resend';
-import * as puppeteer from 'puppeteer';
+import { PDFDocument, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import * as QRCode from 'qrcode';
 import { OrderStatus } from '@prisma/client';
 
@@ -120,7 +121,7 @@ export class EmailService {
         organizationInfo: order.event?.organization,
       });
 
-      // 4. Gửi email qua Resend
+      // 4. Gửi email qua Resend với PDF attachments
       const emailResult = await this.resend.emails.send({
         from: 'Ớt Cay Xè <noreply@otcayxe.com>',
         to: [order.user.email],
@@ -137,11 +138,12 @@ export class EmailService {
 
       return {
         success: true,
-        message: 'Email sent successfully',
+        message: 'Email sent successfully with PDF tickets attached',
         ticketsSent: pdfAttachments.length,
         orderNumber: order.id,
         sentAt: new Date().toISOString(),
         emailId: emailResult.data?.id,
+        attachments: pdfAttachments.map(att => att.filename),
       };
 
     } catch (error) {
@@ -158,140 +160,129 @@ export class EmailService {
   }
 
   private async generateTicketPDF(ticketData: any): Promise<Buffer> {
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-
     try {
-      const page = await browser.newPage();
-
-      // Generate QR code
-      const qrCodeDataUrl = await QRCode.toDataURL(ticketData.qrCode);
-
-      // Create HTML content for PDF
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body { 
-              font-family: 'Inter', Arial, sans-serif; 
-              margin: 0; 
-              padding: 20px; 
-              background-color: #ffffff;
-            }
-            .ticket { 
-              border: 3px solid #c53e00; 
-              padding: 30px; 
-              max-width: 500px; 
-              margin: 0 auto;
-              border-radius: 10px;
-              background: linear-gradient(135deg, #fff 0%, #fff8f0 100%);
-            }
-            .header { 
-              text-align: center; 
-              color: #c53e00; 
-              font-size: 28px; 
-              font-weight: bold; 
-              margin-bottom: 20px;
-              border-bottom: 2px solid #c53e00;
-              padding-bottom: 15px;
-            }
-            .info { 
-              margin: 15px 0; 
-              font-size: 16px;
-              display: flex;
-              justify-content: space-between;
-            }
-            .info strong {
-              color: #c53e00;
-            }
-            .qr-code { 
-              text-align: center; 
-              margin: 30px 0; 
-            }
-            .qr-code img { 
-              width: 150px; 
-              height: 150px; 
-              border: 2px solid #c53e00; 
-              border-radius: 8px; 
-            }
-            .terms { 
-              font-size: 12px; 
-              margin-top: 20px; 
-              background-color: #fff3cd;
-              padding: 15px;
-              border-radius: 5px;
-              border-left: 4px solid #c53e00;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 20px;
-              font-size: 12px;
-              color: #666;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="ticket">
-            <div class="header">${ticketData.organizationName.toUpperCase()}<br>VÉ ĐIỆN TỬ</div>
-            // <div class="info">
-            //   <span>🎫 Mã vé:</span>
-            //   <strong>${ticketData.ticketId}</strong>
-            // </div>
-            <div class="info">
-              <span>👤 Khách hàng:</span>
-              <strong>${ticketData.customerName}</strong>
-            </div>
-            <div class="info">
-              <span>📅 Ngày:</span>
-              <strong>${ticketData.eventDate}</strong>
-            </div>
-            <div class="info">
-              <span>🕐 Giờ:</span>
-              <strong>${ticketData.eventTime}</strong>
-            </div>
-            <div class="info">
-              <span>📍 Địa điểm:</span>
-              <strong>${ticketData.venue}</strong>
-            </div>
-            <div class="info">
-              <span>🎭 Loại vé:</span>
-              <strong>${ticketData.ticketType}</strong>
-            </div>
-            <div class="info">
-              <span>💰 Giá:</span>
-              <strong>${ticketData.price.toLocaleString()}đ</strong>
-            </div>
-            <div class="qr-code">
-              <img src="${qrCodeDataUrl}" />
-            </div>
-            <div class="terms">
-              <strong>📋 Điều khoản:</strong><br>
-              • Mỗi vé chỉ dành cho 1 người<br>
-              • Trình vé tại cửa để vào sự kiện<br>
-              • Không hỗ trợ giữ chỗ
-            </div>
-            <div class="footer">
-              © 2024 ${ticketData.organizationName} - The destination of Indie music
-            </div>
-          </div>
-        </body>
-        </html>
-      `;
-
-      await page.setContent(htmlContent);
-      const pdf = await page.pdf({
-        format: 'A4',
-        printBackground: true,
-        margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' },
+      // Tạo QR code base64
+      const qrCodeDataUrl = await QRCode.toDataURL(ticketData.qrCode, {
+        errorCorrectionLevel: 'H',
+        type: 'image/png',
+        margin: 1,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF',
+        },
+        width: 200,
       });
 
-      return Buffer.from(pdf);
-    } finally {
-      await browser.close();
+      // Tạo PDF document với fontkit
+      const pdfDoc = await PDFDocument.create();
+      pdfDoc.registerFontkit(fontkit);
+      
+      // Sử dụng font built-in để tránh lỗi
+      const font = await pdfDoc.embedFont('Helvetica');
+      
+      const page = pdfDoc.addPage([595.28, 841.89]); // A4 size in points
+
+      // Embed QR code image
+      const base64Data = qrCodeDataUrl.split(',')[1]; // Remove data:image/png;base64, prefix
+      const imageBytes = Buffer.from(base64Data, 'base64');
+      const image = await pdfDoc.embedPng(imageBytes);
+
+      // Scale image to fit nicely on page
+      const { width, height } = image.scale(0.3); // Scale down to 30%
+
+      // Center the QR code image
+      const x = (595.28 - width) / 2;
+      const y = (841.89 - height) / 2;
+
+      // Draw the QR code image
+      page.drawImage(image, {
+        x,
+        y,
+        width,
+        height,
+      });
+
+      // Add text content với font built-in (ASCII safe)
+      const fontSize = 12;
+      const lineHeight = fontSize * 1.2;
+      let currentY = 750; // Start from top
+
+      // Title
+      page.drawText('VE DIEN TU', {
+        x: 50,
+        y: currentY,
+        size: 20,
+        font,
+        color: rgb(0.2, 0.2, 0.2),
+      });
+      currentY -= lineHeight * 2;
+
+      // Ticket information với ASCII safe text
+      const infoTexts = [
+        `Ma ve: ${ticketData.ticketId}`,
+        `Khach hang: ${ticketData.customerName.replace(/[Đđ]/g, 'D')}`,
+        `Su kien: ${ticketData.eventName.replace(/[Đđ]/g, 'D')}`,
+        `Ngay: ${ticketData.eventDate}`,
+        `Gio: ${ticketData.eventTime}`,
+        `Dia diem: ${ticketData.venue.replace(/[Đđ]/g, 'D')}`,
+        `Loai ve: ${ticketData.ticketType.replace(/[Đđ]/g, 'D')}`,
+        `Gia: ${ticketData.price.toLocaleString()} VND`,
+      ];
+
+      infoTexts.forEach(text => {
+        page.drawText(text, {
+          x: 50,
+          y: currentY,
+          size: fontSize,
+          font,
+          color: rgb(0.3, 0.3, 0.3),
+        });
+        currentY -= lineHeight;
+      });
+
+      // Terms and conditions
+      currentY -= lineHeight;
+      page.drawText('Dieu khoan:', {
+        x: 50,
+        y: currentY,
+        size: fontSize,
+        font,
+        color: rgb(0.2, 0.2, 0.2),
+      });
+      currentY -= lineHeight;
+
+      const terms = [
+        '• Moi ve chi danh cho 1 nguoi',
+        '• Trinh ve tai cua de vao su kien',
+        '• Khong ho tro giu cho',
+      ];
+
+      terms.forEach(term => {
+        page.drawText(term, {
+          x: 70,
+          y: currentY,
+          size: fontSize - 2,
+          font,
+          color: rgb(0.4, 0.4, 0.4),
+        });
+        currentY -= lineHeight;
+      });
+
+      // Footer
+      page.drawText(`© 2024 ${ticketData.organizationName.replace(/[Đđ]/g, 'D')}`, {
+        x: 50,
+        y: 50,
+        size: fontSize - 2,
+        font,
+        color: rgb(0.5, 0.5, 0.5),
+      });
+
+      // Save PDF to buffer
+      const pdfBytes = await pdfDoc.save();
+      return Buffer.from(pdfBytes);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      throw new Error(`Failed to generate PDF: ${error.message}`);
     }
   }
 
@@ -453,6 +444,24 @@ export class EmailService {
             color: #78350f;
             margin: 4px 0;
           }
+          .pdf-notice {
+            background-color: #dbeafe;
+            border: 1px solid #3b82f6;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 24px;
+            text-align: center;
+          }
+          .pdf-notice-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1e40af;
+            margin-bottom: 8px;
+          }
+          .pdf-notice-text {
+            font-size: 14px;
+            color: #1e3a8a;
+          }
           @media (max-width: 600px) {
             .info-grid {
               grid-template-columns: 1fr;
@@ -571,6 +580,13 @@ export class EmailService {
                   <span>Tổng cộng:</span>
                   <span>${data.orderInfo.totalAmount.toLocaleString('vi-VN')} VND</span>
                 </div>
+              </div>
+            </div>
+            
+            <div class="pdf-notice">
+              <div class="pdf-notice-title">📎 PDF Vé Điện Tử</div>
+              <div class="pdf-notice-text">
+                Vé điện tử đã được đính kèm trong email này. Mỗi vé có QR code riêng để check-in tại sự kiện.
               </div>
             </div>
             
