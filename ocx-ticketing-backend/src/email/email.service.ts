@@ -202,6 +202,27 @@ export class EmailService {
         height,
       });
 
+      // Helper function to sanitize Vietnamese text for ASCII compatibility
+      const sanitizeText = (text: string): string => {
+        if (!text) return '';
+        return text
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+          .replace(/[Đđ]/g, 'D')
+          .replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, 'a')
+          .replace(/[èéẹẻẽêềếệểễ]/g, 'e')
+          .replace(/[ìíịỉĩ]/g, 'i')
+          .replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, 'o')
+          .replace(/[ùúụủũưừứựửữ]/g, 'u')
+          .replace(/[ỳýỵỷỹ]/g, 'y')
+          .replace(/[ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴ]/g, 'A')
+          .replace(/[ÈÉẸẺẼÊỀẾỆỂỄ]/g, 'E')
+          .replace(/[ÌÍỊỈĨ]/g, 'I')
+          .replace(/[ÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠ]/g, 'O')
+          .replace(/[ÙÚỤỦŨƯỪỨỰỬỮ]/g, 'U')
+          .replace(/[ỲÝỴỶỸ]/g, 'Y');
+      };
+
       // Add text content với font built-in (ASCII safe)
       const fontSize = 12;
       const lineHeight = fontSize * 1.2;
@@ -220,12 +241,12 @@ export class EmailService {
       // Ticket information với ASCII safe text
       const infoTexts = [
         `Ma ve: ${ticketData.ticketId}`,
-        `Khach hang: ${ticketData.customerName.replace(/[Đđ]/g, 'D')}`,
-        `Su kien: ${ticketData.eventName.replace(/[Đđ]/g, 'D')}`,
+        `Khach hang: ${sanitizeText(ticketData.customerName)}`,
+        `Su kien: ${sanitizeText(ticketData.eventName)}`,
         `Ngay: ${ticketData.eventDate}`,
         `Gio: ${ticketData.eventTime}`,
-        `Dia diem: ${ticketData.venue.replace(/[Đđ]/g, 'D')}`,
-        `Loai ve: ${ticketData.ticketType.replace(/[Đđ]/g, 'D')}`,
+        `Dia diem: ${sanitizeText(ticketData.venue)}`,
+        `Loai ve: ${sanitizeText(ticketData.ticketType)}`,
         `Gia: ${ticketData.price.toLocaleString()} VND`,
       ];
 
@@ -269,7 +290,7 @@ export class EmailService {
       });
 
       // Footer
-      page.drawText(`© 2024 ${ticketData.organizationName.replace(/[Đđ]/g, 'D')}`, {
+      page.drawText(`© 2024 ${sanitizeText(ticketData.organizationName)}`, {
         x: 50,
         y: 50,
         size: fontSize - 2,
