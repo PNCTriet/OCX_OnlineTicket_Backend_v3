@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build",
+    "build": "nest build && node copy-templates.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -38,6 +38,7 @@
     "@types/puppeteer": "^7.0.4",
     "@types/qrcode": "^1.5.5",
     "axios": "^1.11.0",
+    "canvas": "^3.1.2",
     "express-basic-auth": "^1.2.1",
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^7.0.5",
@@ -49,6 +50,7 @@
     "reflect-metadata": "^0.2.2",
     "resend": "^4.7.0",
     "rxjs": "^7.8.1",
+    "svg2img": "^1.0.0-beta.2",
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
