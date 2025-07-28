@@ -65,8 +65,8 @@ export class EmailService {
             ticketId: code.code,
             customerName: `${order.user.first_name || ''} ${order.user.last_name || ''}`.trim() || 'Khách hàng',
             eventName: order.event?.title || 'Sự kiện',
-            eventDate: order.event?.start_date ? new Date(order.event.start_date).toLocaleDateString('vi-VN') : 'TBD',
-            eventTime: order.event?.start_date ? new Date(order.event.start_date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'TBD',
+            eventDate: order.event?.start_date ? order.event.start_date : null,
+            eventTime: order.event?.start_date ? order.event.start_date : null,
             venue: order.event?.location || 'Địa điểm TBD',
             ticketType: orderItem.ticket.name,
             price: Number(orderItem.price),
@@ -77,8 +77,22 @@ export class EmailService {
 
           const pdfBuffer = await this.generateTicketPDF(ticketData);
           
-          // Tạo tên file PDF với format: VE-[ORDER_ID]-[TICKET_CODE]-[COUNTER].pdf
-          const pdfFilename = `VE-${order.id}-${code.code}-${ticketCounter}.pdf`;
+          // Tạo tên file PDF với format: [Người mua]_[Sự kiện]_[Loại vé]_[Số thứ tự].pdf
+          const customerName = `${order.user.first_name || ''} ${order.user.last_name || ''}`.trim() || 'KhachHang';
+          const eventName = order.event?.title || 'SuKien';
+          const ticketType = orderItem.ticket.name || 'Ve';
+          
+          // Sanitize tên file (loại bỏ ký tự đặc biệt, dấu cách)
+          const sanitizeFileName = (str: string) => {
+            return str
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+              .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
+              .replace(/\s+/g, '_') // Replace spaces with underscore
+              .toUpperCase();
+          };
+          
+          const pdfFilename = `${sanitizeFileName(customerName)}_${sanitizeFileName(eventName)}_${sanitizeFileName(ticketType)}_${ticketCounter}.pdf`;
           
           pdfAttachments.push({
             filename: pdfFilename,
@@ -323,10 +337,10 @@ export class EmailService {
         {
           // Giờ tổ chức: format "16:00 - 22:00" với 2 giờ nằm dọc thẳng hàng
           value: ticketData.eventTime ? (() => {
-            const timeParts = ticketData.eventTime.split(':');
-            const hour = parseInt(timeParts[0]);
-            const minute = timeParts[1];
-            const endHour = hour + 3;
+            const eventDate = new Date(ticketData.eventTime);
+            const hour = eventDate.getHours();
+            const minute = eventDate.getMinutes().toString().padStart(2, '0');
+            const endHour = hour + 7;
             return `${hour}:${minute} - ${endHour}:${minute}`;
           })() : 'N/A',
           x: 80,   // Vị trí A5: 105 * 0.705
@@ -338,11 +352,11 @@ export class EmailService {
         {
           // Ngày tổ chức: format "28 SEPTEMBER" với số và tháng có vị trí riêng
           value: ticketData.eventDate ? (() => {
-            const date = new Date(ticketData.eventDate);
-            const day = date.getDate();
+            const eventDate = new Date(ticketData.eventDate);
+            const day = eventDate.getDate();
             const monthNames = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 
                               'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
-            const month = monthNames[date.getMonth()];
+            const month = monthNames[eventDate.getMonth()];
             return { day: day.toString(), month: month };
           })() : { day: 'N/A', month: 'N/A' },
           x: 170,   // Vị trí A5: 230 * 0.705
@@ -351,7 +365,7 @@ export class EmailService {
           color: backgroundImage ? rgb(0, 0, 0) : rgb(0.3, 0.3, 0.3),
           isDate: true, // Đánh dấu để format đặc biệt
           // Vị trí riêng cho số và tháng từ test file
-          dayX: 200, // Vị trí X của số A5: 270 * 0.705
+          dayX: 195, // Vị trí X của số A5: 270 * 0.705
           dayY: 282, // Vị trí Y của số A5: 400 * 0.705
           monthX: 170, // Vị trí X của tháng A5: 240 * 0.705
           monthY: 260, // Vị trí Y của tháng A5: 380 * 0.705
