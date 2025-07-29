@@ -57,6 +57,14 @@
 - GET /dashboard/event/:id
 - GET /dashboard/event/:id/time
 
+## 11. Email API
+- POST /email/send-tickets/:orderId
+- POST /email/send-confirmation/:orderId
+
+## 12. Event Settings API
+- GET /events/:eventId/settings
+- PUT /events/:eventId/settings
+
 ---
 
 ## **Chi tiết các API mới/cập nhật:**
@@ -111,6 +119,93 @@
 - **POST** `/dashboard/organization/:id/send-report` — Gửi báo cáo tổ chức qua email
 - **GET** `/dashboard/event/:id` — Thống kê sự kiện
 - **GET** `/dashboard/event/:id/time` — Thống kê sự kiện theo thời gian
+
+### 11. Email API
+- **POST** `/email/send-tickets/:orderId` — Gửi email vé điện tử với PDF đính kèm
+  - **Required Role:** ADMIN_ORGANIZER, OWNER_ORGANIZER, SUPERADMIN
+  - **Description:** Gửi email chứa vé điện tử PDF cho đơn hàng đã thanh toán thành công
+  - **Response:**
+    ```json
+    {
+      "success": true,
+      "message": "Email sent successfully with PDF tickets attached",
+      "ticketsSent": 3,
+      "orderNumber": "order_cuid",
+      "sentAt": "2024-01-15T14:30:25.000Z",
+      "emailId": "resend_email_id",
+      "attachments": ["file1.pdf", "file2.pdf", "file3.pdf"]
+    }
+    ```
+  - **Error Responses:**
+    - `400`: Đơn hàng chưa thanh toán hoặc không tìm thấy
+    - `403`: Không có quyền truy cập
+
+- **POST** `/email/send-confirmation/:orderId` — Gửi email xác nhận đặt vé thành công
+  - **Required Role:** ADMIN_ORGANIZER, OWNER_ORGANIZER, SUPERADMIN
+  - **Description:** Gửi email xác nhận đặt vé (không kèm PDF) để thông báo cho user biết đơn hàng đã được ghi nhận
+  - **Response:**
+    ```json
+    {
+      "success": true,
+      "message": "Order confirmation email sent successfully",
+      "orderNumber": "order_cuid",
+      "sentAt": "2024-01-15T14:30:25.000Z",
+      "emailId": "resend_email_id"
+    }
+    ```
+  - **Error Responses:**
+    - `400`: Không tìm thấy đơn hàng hoặc email user
+    - `403`: Không có quyền truy cập
+
+### 12. Event Settings API
+- **GET** `/events/:eventId/settings` — Lấy cài đặt email tự động cho event
+  - **Required Role:** ADMIN_ORGANIZER, OWNER_ORGANIZER, SUPERADMIN
+  - **Description:** Lấy cài đặt auto send confirm email và ticket email cho event
+  - **Response:**
+    ```json
+    {
+      "auto_send_confirm_email": true,
+      "auto_send_ticket_email": false
+    }
+    ```
+  - **Error Responses:**
+    - `404`: Event not found
+    - `403`: Access denied
+
+- **PUT** `/events/:eventId/settings` — Cập nhật cài đặt email tự động cho event
+  - **Required Role:** ADMIN_ORGANIZER, OWNER_ORGANIZER, SUPERADMIN
+  - **Description:** Cập nhật cài đặt auto send confirm email và ticket email cho event
+  - **Body:**
+    ```json
+    {
+      "auto_send_confirm_email": true,
+      "auto_send_ticket_email": false
+    }
+    ```
+  - **Response:** Tương tự GET
+  - **Error Responses:**
+    - `404`: Event not found
+    - `403`: Access denied
+
+**Logic Auto Send Email:**
+1. **Auto send confirm email = true, Auto send ticket email = false:**
+   - ✅ Gửi confirm email tự động khi order PAID
+   - ❌ Không gửi ticket email tự động
+   - 📧 Ticket email phải gửi thủ công qua API
+
+2. **Auto send ticket email = true (bất kể confirm email):**
+   - ✅ Gửi ticket email tự động khi order PAID
+   - ❌ Không gửi confirm email (dù có bật hay không)
+   - 📧 Confirm email không được gửi
+
+3. **Cả hai đều false:**
+   - ❌ Không gửi email tự động
+   - 📧 Phải gửi thủ công qua API
+
+**Luồng Email:**
+1. **Email xác nhận:** Gửi ngay sau khi đặt vé thành công để thông báo cho user
+2. **Email vé điện tử:** Gửi sau khi thanh toán thành công với PDF vé đính kèm
+3. **Auto Email:** Tự động gửi email dựa trên cài đặt của event khi thanh toán thành công
 
 ### 6. Orders API (bổ sung)
 - **GET** `/orders/event/:eventId/items` — Lấy order items theo event ID

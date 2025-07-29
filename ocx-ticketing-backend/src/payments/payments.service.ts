@@ -2,6 +2,8 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma.service';
 import { PaymentStatus, OrderStatus } from '@prisma/client';
 import { OrdersService } from '../orders/orders.service';
+import { EmailService } from '../email/email.service';
+import { EventSettingsService } from '../events/event-settings.service';
 import axios from 'axios';
 
 interface SepayWebhookData {
@@ -24,6 +26,8 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ordersService: OrdersService,
+    private readonly emailService: EmailService,
+    private readonly eventSettingsService: EventSettingsService,
   ) {}
 
   // Xử lý Sepay webhook
@@ -97,6 +101,28 @@ export class PaymentsService {
           reserved_until: null, // Bỏ reservation timeout để tránh bị expire
         },
       });
+
+      // 4. Kiểm tra event settings và gửi email tự động
+      if (order.event_id) {
+        try {
+          const shouldSendConfirmEmail = await this.eventSettingsService.shouldSendConfirmEmail(order.event_id);
+          const shouldSendTicketEmail = await this.eventSettingsService.shouldSendTicketEmail(order.event_id);
+
+          if (shouldSendTicketEmail) {
+            // Gửi ticket email tự động (không gửi confirm)
+            console.log('Auto sending ticket email for order:', order.id);
+            await this.emailService.sendTicketEmail(order.id);
+          } else if (shouldSendConfirmEmail) {
+            // Gửi confirm email tự động (không gửi ticket)
+            console.log('Auto sending confirm email for order:', order.id);
+            await this.emailService.sendOrderConfirmationEmail(order.id);
+          }
+          // Nếu cả hai đều tắt thì không gửi email tự động
+        } catch (error) {
+          console.error('Error sending auto email:', error);
+          // Không throw error để không ảnh hưởng đến payment processing
+        }
+      }
 
       // Gửi webhook tới frontend
       try {

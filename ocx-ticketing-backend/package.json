@@ -39,6 +39,8 @@
     "@types/qrcode": "^1.5.5",
     "axios": "^1.11.0",
     "canvas": "^3.1.2",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
     "express-basic-auth": "^1.2.1",
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^7.0.5",

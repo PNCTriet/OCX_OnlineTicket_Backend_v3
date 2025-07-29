@@ -140,8 +140,25 @@ model Event {
   organization Organization @relation(fields: [organization_id], references: [id], onDelete: Cascade)
   tickets      Ticket[]
   orders       Order[]
+  settings     EventSetting[]
 
   @@map("events")
+}
+
+// Event Setting Model
+model EventSetting {
+  id            String   @id @default(cuid())
+  event_id      String
+  setting_key   String   // "auto_send_confirm_email", "auto_send_ticket_email"
+  setting_value String   // "true", "false"
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  // Relationships
+  event Event @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@unique([event_id, setting_key])
+  @@map("event_settings")
 }
 
 // Ticket Model
