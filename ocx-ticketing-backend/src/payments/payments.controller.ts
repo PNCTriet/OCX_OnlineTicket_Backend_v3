@@ -107,4 +107,44 @@ export class PaymentsController {
       offset ? parseInt(offset) : 0
     );
   }
+
+  @Get('event/:eventId')
+  @UseGuards(JwtAuthGuard, RoleGuard)
+  @Roles(UserRole.ADMIN_ORGANIZER, UserRole.OWNER_ORGANIZER, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Get all payments for an event',
+    description: 'View all successful payments for a specific event with detailed information including user data and order items'
+  })
+  @ApiQuery({ name: 'limit', required: false, description: 'Number of records to return (default: 3000)' })
+  @ApiQuery({ name: 'offset', required: false, description: 'Number of records to skip (default: 0)' })
+  @ApiResponse({ status: 200, description: 'List of payments for the event with summary statistics' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  @ApiResponse({ status: 403, description: 'Access denied. Admin/Organizer role required.' })
+  async getPaymentsByEvent(
+    @Param('eventId') eventId: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.paymentsService.getPaymentsByEvent(
+      eventId,
+      limit ? parseInt(limit) : 3000,
+      offset ? parseInt(offset) : 0
+    );
+  }
+
+  @Get('event/:eventId/revenue-summary')
+  @UseGuards(JwtAuthGuard, RoleGuard)
+  @Roles(UserRole.ADMIN_ORGANIZER, UserRole.OWNER_ORGANIZER, UserRole.SUPERADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Get revenue summary for an event',
+    description: 'Get total revenue, payment statistics, daily stats, and ticket breakdown for an event without pagination'
+  })
+  @ApiResponse({ status: 200, description: 'Revenue summary with detailed statistics' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  @ApiResponse({ status: 403, description: 'Access denied. Admin/Organizer role required.' })
+  async getEventRevenueSummary(@Param('eventId') eventId: string) {
+    return this.paymentsService.getEventRevenueSummary(eventId);
+  }
 } 

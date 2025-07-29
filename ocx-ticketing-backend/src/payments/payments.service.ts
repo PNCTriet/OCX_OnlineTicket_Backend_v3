@@ -399,4 +399,229 @@ export class PaymentsService {
       },
     };
   }
+
+  // Lấy tất cả payment theo event_id
+  async getPaymentsByEvent(eventId: string, limit: number = 3000, offset: number = 0) {
+    // Kiểm tra event tồn tại
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) {
+      throw new NotFoundException(`Event ${eventId} not found`);
+    }
+
+    const payments = await this.prisma.payment.findMany({
+      where: {
+        order: {
+          event_id: eventId,
+        },
+        status: PaymentStatus.SUCCESS, // Chỉ lấy payment thành công
+      },
+      include: {
+        order: {
+          select: {
+            id: true,
+            total_amount: true,
+            status: true,
+            created_at: true,
+            paid_at: true,
+            user: {
+              select: {
+                id: true,
+                email: true,
+                first_name: true,
+                last_name: true,
+                phone: true,
+              },
+            },
+            order_items: {
+              include: {
+                ticket: {
+                  select: {
+                    id: true,
+                    name: true,
+                    price: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { created_at: 'desc' },
+      take: limit,
+      skip: offset,
+    });
+
+    const total = await this.prisma.payment.count({
+      where: {
+        order: {
+          event_id: eventId,
+        },
+        status: PaymentStatus.SUCCESS,
+      },
+    });
+
+    // Tính tổng doanh thu của event
+    const totalRevenue = await this.prisma.payment.aggregate({
+      where: {
+        order: {
+          event_id: eventId,
+        },
+        status: PaymentStatus.SUCCESS,
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    return {
+      event: {
+        id: event.id,
+        title: event.title,
+        start_date: event.start_date,
+        end_date: event.end_date,
+      },
+      payments,
+      pagination: {
+        total,
+        limit,
+        offset,
+        hasMore: offset + limit < total,
+      },
+      summary: {
+        totalRevenue: totalRevenue._sum.amount || 0,
+        totalPayments: total,
+      },
+    };
+  }
+
+  // Lấy tổng doanh thu và thống kê của event (không có pagination)
+  async getEventRevenueSummary(eventId: string) {
+    // Kiểm tra event tồn tại
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+    });
+
+    if (!event) {
+      throw new NotFoundException(`Event ${eventId} not found`);
+    }
+
+    // Tính tổng doanh thu
+    const totalRevenue = await this.prisma.payment.aggregate({
+      where: {
+        order: {
+          event_id: eventId,
+        },
+        status: PaymentStatus.SUCCESS,
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    // Đếm tổng số payment
+    const totalPayments = await this.prisma.payment.count({
+      where: {
+        order: {
+          event_id: eventId,
+        },
+        status: PaymentStatus.SUCCESS,
+      },
+    });
+
+    // Đếm tổng số orders
+    const totalOrders = await this.prisma.order.count({
+      where: {
+        event_id: eventId,
+        status: OrderStatus.PAID,
+      },
+    });
+
+    // Thống kê theo ngày
+    const dailyStats = await this.prisma.payment.groupBy({
+      by: ['created_at'],
+      where: {
+        order: {
+          event_id: eventId,
+        },
+        status: PaymentStatus.SUCCESS,
+      },
+      _sum: {
+        amount: true,
+      },
+      _count: {
+        id: true,
+      },
+      orderBy: {
+        created_at: 'desc',
+      },
+      take: 30, // 30 ngày gần nhất
+    });
+
+    // Thống kê theo ticket type
+    const ticketStats = await this.prisma.orderItem.groupBy({
+      by: ['ticket_id'],
+      where: {
+        order: {
+          event_id: eventId,
+          status: OrderStatus.PAID,
+        },
+      },
+      _sum: {
+        quantity: true,
+        price: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    // Lấy thông tin ticket names
+    const ticketInfo = await this.prisma.ticket.findMany({
+      where: {
+        event_id: eventId,
+      },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+      },
+    });
+
+    // Map ticket stats với ticket names
+    const ticketStatsWithNames = ticketStats.map(stat => {
+      const ticket = ticketInfo.find(t => t.id === stat.ticket_id);
+      return {
+        ticket_id: stat.ticket_id,
+        ticket_name: ticket?.name || 'Unknown',
+        ticket_price: ticket?.price || 0,
+        total_quantity: stat._sum.quantity || 0,
+        total_revenue: stat._sum.price || 0,
+        order_count: stat._count.id,
+      };
+    });
+
+    return {
+      event: {
+        id: event.id,
+        title: event.title,
+        start_date: event.start_date,
+        end_date: event.end_date,
+      },
+      summary: {
+        totalRevenue: totalRevenue._sum.amount || 0,
+        totalPayments: totalPayments,
+        totalOrders: totalOrders,
+        averageOrderValue: totalOrders > 0 ? Number(totalRevenue._sum.amount || 0) / totalOrders : 0,
+      },
+      dailyStats: dailyStats.map(stat => ({
+        date: stat.created_at,
+        revenue: stat._sum.amount || 0,
+        paymentCount: stat._count.id,
+      })),
+      ticketStats: ticketStatsWithNames,
+    };
+  }
 } 

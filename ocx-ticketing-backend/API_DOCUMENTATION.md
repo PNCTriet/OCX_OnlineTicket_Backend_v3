@@ -45,6 +45,8 @@
 - GET /payments/match/:orderId
 - GET /payments/unmatched
 - GET /payments/pending-orders
+- GET /payments/event/:eventId
+- GET /payments/event/:eventId/revenue-summary
 
 ## 10. Dashboard API
 - GET /dashboard/system
@@ -87,12 +89,74 @@
 - **GET** `/payments/match/:orderId` — Match thủ công payment với order
 - **GET** `/payments/unmatched` — Danh sách payment chưa match
 - **GET** `/payments/pending-orders` — Danh sách order chờ thanh toán
+- **GET** `/payments/event/:eventId` — Lấy tất cả payment của event (với pagination)
+- **GET** `/payments/event/:eventId/revenue-summary` — Lấy tổng doanh thu và thống kê event
 - **Required Role:** ADMIN_ORGANIZER, OWNER_ORGANIZER, SUPERADMIN (trừ webhook)
 - **Logic matching:**
   1. Ưu tiên orderId trong content
   2. Amount + thời gian gần
   3. Email user (nếu có)
   4. Nếu không match, lưu payment PENDING để admin match thủ công
+
+**Payment Event APIs:**
+- **GET** `/payments/event/:eventId` — Lấy danh sách payment của event
+  - **Query Parameters:**
+    - `limit` (optional): Số lượng records trả về (default: 3000)
+    - `offset` (optional): Số lượng records bỏ qua (default: 0)
+  - **Response:**
+    ```json
+    {
+      "event": { "id": "event_cuid", "title": "Event Title" },
+      "payments": [
+        {
+          "id": "payment_cuid",
+          "amount": 199000,
+          "status": "SUCCESS",
+          "order": {
+            "id": "order_cuid",
+            "user": { "email": "user@example.com" },
+            "order_items": [
+              {
+                "ticket": { "name": "Vé Đứng", "price": 199000 }
+              }
+            ]
+          }
+        }
+      ],
+      "pagination": { "total": 150, "limit": 3000, "offset": 0, "hasMore": false },
+      "summary": { "totalRevenue": 29850000, "totalPayments": 150 }
+    }
+    ```
+
+- **GET** `/payments/event/:eventId/revenue-summary` — Lấy tổng doanh thu và thống kê
+  - **Description:** Tính tổng doanh thu, thống kê theo ngày, breakdown theo ticket type
+  - **Response:**
+    ```json
+    {
+      "event": { "id": "event_cuid", "title": "Event Title" },
+      "summary": {
+        "totalRevenue": 29850000,
+        "totalPayments": 150,
+        "totalOrders": 150,
+        "averageOrderValue": 199000
+      },
+      "dailyStats": [
+        {
+          "date": "2025-07-27T00:00:00Z",
+          "revenue": 1990000,
+          "paymentCount": 10
+        }
+      ],
+      "ticketStats": [
+        {
+          "ticket_name": "Vé Đứng",
+          "total_quantity": 100,
+          "total_revenue": 19900000,
+          "order_count": 100
+        }
+      ]
+    }
+    ```
 
 ### 10. Dashboard API
 - **GET** `/dashboard/system` — Thống kê tổng quan hệ thống
