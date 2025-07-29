@@ -102,7 +102,10 @@ export class PaymentsService {
         },
       });
 
-      // 4. Kiểm tra event settings và gửi email tự động
+      // 4. Sinh mã code cho order_item_code khi order PAID (TRƯỚC KHI gửi email)
+      await this.ordersService.generateOrderItemCodesForOrder(order.id);
+
+      // 5. Kiểm tra event settings và gửi email tự động (SAU KHI có QR codes)
       if (order.event_id) {
         try {
           const shouldSendConfirmEmail = await this.eventSettingsService.shouldSendConfirmEmail(order.event_id);
@@ -124,7 +127,7 @@ export class PaymentsService {
         }
       }
 
-      // Gửi webhook tới frontend
+      // 6. Gửi webhook tới frontend
       try {
         let userEmail = '';
         // Nếu order có thuộc tính user (từ findMany include), lấy email từ đó
@@ -146,9 +149,6 @@ export class PaymentsService {
       } catch (err) {
         console.error('Failed to send payment webhook to frontend:', err?.message || err);
       }
-
-      // Sinh mã code cho order_item_code khi order PAID
-      await this.ordersService.generateOrderItemCodesForOrder(order.id);
 
       return {
         success: true,
