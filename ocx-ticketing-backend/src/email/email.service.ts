@@ -437,8 +437,10 @@ export class EmailService {
           // Giờ tổ chức: format "16:00 - 22:00" với 2 giờ nằm dọc thẳng hàng
           value: ticketData.eventTime ? (() => {
             const eventDate = new Date(ticketData.eventTime);
-            const hour = eventDate.getHours();
-            const minute = eventDate.getMinutes().toString().padStart(2, '0');
+            // Convert to Vietnam timezone
+            const vietnamTime = new Date(eventDate.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+            const hour = vietnamTime.getHours();
+            const minute = vietnamTime.getMinutes().toString().padStart(2, '0');
             const endHour = hour + 7;
             return `${hour}:${minute} - ${endHour}:${minute}`;
           })() : 'N/A',
@@ -452,10 +454,12 @@ export class EmailService {
           // Ngày tổ chức: format "28 SEPTEMBER" với số và tháng có vị trí riêng
           value: ticketData.eventDate ? (() => {
             const eventDate = new Date(ticketData.eventDate);
-            const day = eventDate.getDate();
+            // Convert to Vietnam timezone
+            const vietnamTime = new Date(eventDate.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
+            const day = vietnamTime.getDate();
             const monthNames = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 
                               'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
-            const month = monthNames[eventDate.getMonth()];
+            const month = monthNames[vietnamTime.getMonth()];
             return { day: day.toString(), month: month };
           })() : { day: 'N/A', month: 'N/A' },
           x: 170,   // Vị trí A5: 230 * 0.705
