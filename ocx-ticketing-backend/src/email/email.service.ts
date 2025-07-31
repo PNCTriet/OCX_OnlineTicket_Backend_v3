@@ -119,8 +119,8 @@ export class EmailService {
         },
         orderInfo: {
           orderNumber: order.id,
-          orderDate: order.created_at.toLocaleDateString('vi-VN'),
-          orderTime: order.created_at.toLocaleTimeString('vi-VN'),
+          orderDate: order.created_at.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
+          orderTime: order.created_at.toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }),
           totalAmount: Number(order.total_amount),
         },
         tickets: order.order_items.map(item => ({
@@ -133,8 +133,12 @@ export class EmailService {
         })),
         eventInfo: {
           name: order.event?.title || 'Sự kiện',
-          date: order.event?.start_date ? new Date(order.event.start_date).toLocaleDateString('vi-VN') : 'TBD',
-          time: order.event?.start_date ? new Date(order.event.start_date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'TBD',
+          date: order.event?.start_date ? new Date(order.event.start_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'TBD',
+          time: order.event?.start_date ? new Date(order.event.start_date).toLocaleTimeString('vi-VN', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            timeZone: 'Asia/Ho_Chi_Minh'
+          }) : 'TBD',
           venue: order.event?.location || 'Địa điểm TBD',
           address: order.event?.location || 'Địa chỉ TBD',
         },
@@ -147,7 +151,7 @@ export class EmailService {
       const emailResult = await this.resend.emails.send({
         from: 'Ớt Cay Xè <noreply@otcayxe.com>',
         to: [order.user.email],
-        subject: `🎫 Vé điện tử ${order.event?.title || 'Ớt Cay Xè'} - Đơn hàng #${order.id}`,
+        subject: `[${order.event?.title || 'Ớt Cay Xè'}] - Vé điện tử`,
         html: htmlContent,
         attachments: pdfAttachments,
       });
@@ -236,8 +240,12 @@ export class EmailService {
         })),
         eventInfo: {
           name: order.event?.title || 'Sự kiện',
-          date: order.event?.start_date ? new Date(order.event.start_date).toLocaleDateString('vi-VN') : 'TBD',
-          time: order.event?.start_date ? new Date(order.event.start_date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'TBD',
+          date: order.event?.start_date ? new Date(order.event.start_date).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'TBD',
+          time: order.event?.start_date ? new Date(order.event.start_date).toLocaleTimeString('vi-VN', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            timeZone: 'Asia/Ho_Chi_Minh'
+          }) : 'TBD',
           venue: order.event?.location || 'Địa điểm TBD',
           address: order.event?.location || 'Địa chỉ TBD',
         },
@@ -250,7 +258,7 @@ export class EmailService {
       const emailResult = await this.resend.emails.send({
         from: 'Ớt Cay Xè <noreply@otcayxe.com>',
         to: [order.user.email],
-        subject: `✅ Xác nhận đặt vé ${order.event?.title || 'Ớt Cay Xè'} - Đơn hàng #${order.id}`,
+        subject: `[${order.event?.title || 'Ớt Cay Xè'}] - Xác nhận mua vé thành công`,
         html: htmlContent,
       });
 
