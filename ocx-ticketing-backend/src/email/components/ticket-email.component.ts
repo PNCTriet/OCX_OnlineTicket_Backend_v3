@@ -112,13 +112,13 @@ export class TicketEmailComponent {
             <div style="margin-bottom: 24px; padding: 16px; background-color: rgba(255,255,255,0.08); border-radius: 12px;">
                 <h3 class="mobile-heading" style="margin-top: 0; color: #ffb347 !important; -webkit-text-fill-color: #ffb347 !important;">Thông tin đơn hàng</h3>
                 <div class="info-row" style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Mã đơn : </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">#${data.orderInfo.orderNumber}</span></p>
+                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Mã đơn: </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">#${data.orderInfo.orderNumber}</span></p>
                 </div>
                 <div class="info-row" style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Khách hàng : </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">${data.customerInfo.fullName}</span></p>
+                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Khách hàng: </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">${data.customerInfo.fullName}</span></p>
                 </div>
                 <div class="info-row" style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Email : </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">${data.customerInfo.email}</span></p>
+                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Email: </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">${data.customerInfo.email}</span></p>
                 </div>
             </div>
 
@@ -126,27 +126,27 @@ export class TicketEmailComponent {
                 <h3 class="mobile-heading" style="margin-top: 0; color: #ffb347 !important; -webkit-text-fill-color: #ffb347 !important;">Chi tiết vé</h3>
                 ${data.tickets.map((ticket: any) => `
                 <div class="info-row" style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Loại vé : </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">${ticket.name} - ${ticket.price.toLocaleString('vi-VN')}đ</span></p>
+                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Loại vé: </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">${ticket.name} - ${ticket.price.toLocaleString('vi-VN')}đ</span></p>
                 </div>
                 <div class="info-row" style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Số lượng : </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">${ticket.quantity} vé</span></p>
+                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Số lượng: </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">${ticket.quantity} vé</span></p>
                 </div>
                 `).join('')}
                 <div class="info-row" style="display: flex; justify-content: space-between; padding: 6px 0;">
-                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">QR Code : </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">Vé PDF đính kèm</span></p>
+                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">QR Code: </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">Vé PDF đính kèm</span></p>
                 </div>
             </div>
 
             <div style="margin-bottom: 24px; padding: 16px; background-color: rgba(255,255,255,0.08); border-radius: 12px;">
                 <h3 class="mobile-heading" style="margin-top: 0; color: #ffb347 !important; -webkit-text-fill-color: #ffb347 !important;">Thông tin sự kiện</h3>
                 <div class="info-row" style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Sự kiện : </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">${data.eventInfo.name}</span></p>
+                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Sự kiện: </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">${data.eventInfo.name}</span></p>
                 </div>
                 <div class="info-row" style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Thời gian : </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">${data.eventInfo.time} | ${data.eventInfo.date}</span></p>
+                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Thời gian: </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">${data.eventInfo.time} | ${data.eventInfo.date}</span></p>
                 </div>
                 <div class="info-row" style="display: flex; justify-content: space-between; padding: 6px 0;">
-                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Địa điểm : </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">${data.eventInfo.venue}</span></p>
+                    <p class="mobile-text"><strong style="color: white !important; -webkit-text-fill-color: white !important;">Địa điểm: </strong><span style="color: white !important; -webkit-text-fill-color: white !important;">${data.eventInfo.venue}</span></p>
                 </div>
             </div>
 
@@ -156,20 +156,16 @@ export class TicketEmailComponent {
                     <h3 class="mobile-heading" style="margin-top: 0; color: #ffb347 !important; -webkit-text-fill-color: #ffb347 !important; font-size: 16px; margin-bottom: 16px;">Thông tin hỗ trợ</h3>
                     <div style="text-align: center; line-height: 2;">
                         <p class="mobile-text" style="color: white !important; -webkit-text-fill-color: white !important; font-size: 14px; margin: 0; ">
-                            Mail to : <a href="mailto:${data.organizationInfo?.contact_email || 'otconcert@gmail.com'}" style="color: #FF8C42 !important; -webkit-text-fill-color: #FF8C42 !important; text-decoration: none;">${data.organizationInfo?.contact_email || 'otconcert@gmail.com'}</a>
+                            Mail to: <a href="mailto:${data.organizationInfo?.contact_email || 'otconcert@gmail.com'}" style="color: #FF8C42 !important; -webkit-text-fill-color: #FF8C42 !important; text-decoration: none;">${data.organizationInfo?.contact_email || 'otconcert@gmail.com'}</a>
                         </p>
                         <p class="mobile-text" style="color: white !important; -webkit-text-fill-color: white !important; font-size: 14px; margin: 0;">
-                            SĐT : ${data.organizationInfo?.phone || '0934782703'} ( Trưởng BTC )
+                            SĐT: ${data.organizationInfo?.phone || '0934782703'} ( Trưởng BTC )
                         </p>
                         <p class="mobile-text" style="color: white !important; -webkit-text-fill-color: white !important; font-size: 14px; margin: 0;">
-                            Website : <a href="${data.organizationInfo?.website || 'https://otcayxe.com'}" target="_blank" style="color: #FF8C42 !important; -webkit-text-fill-color: #FF8C42 !important; text-decoration: none;">${data.organizationInfo?.website || 'https://otcayxe.com'}</a>
+                            Website: <a href="${data.organizationInfo?.website || 'https://otcayxe.com'}" target="_blank" style="color: #FF8C42 !important; -webkit-text-fill-color: #FF8C42 !important; text-decoration: none;">${data.organizationInfo?.website || 'https://otcayxe.com'}</a>
                         </p>
                     </div>
                 </div>
-                <p class="mobile-text" style="font-size: 12px; opacity: 0.6; color: white !important; -webkit-text-fill-color: white !important;">
-                    Vé được phân phối qua hệ thống
-                    <a href="https://howlstudio.tech" target="_blank" style="color: #FF8C42 !important; -webkit-text-fill-color: #FF8C42 !important; text-decoration: none;">HowlsTicket</a>
-                </p>
             </div>
         </div>
     </div>
